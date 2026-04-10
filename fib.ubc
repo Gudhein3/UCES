@@ -1,0 +1,89 @@
+ldlx 1 r1
+ldlx 1 r2
+
+loop:
+  push r1
+  push r2
+  mv r1 a0
+  ldlx putd r0
+  call r0
+  pop r2
+  pop r1
+
+  mv r1 r3
+  add r1 r2 r1
+  mv r3 r2
+
+  ldhx h7FE0 r4
+  ldlx 10 r5
+  wr8 r4 r5
+
+  ldlx 100 r3
+  cmp r1 r3 r3
+  tsbi r3 7 r3
+  ldlx loop r4
+  mvo r3 r4 pc
+  hlt
+
+putd::
+  ldl h86A0 r0 ;; 100000
+  ldh h0001 r0
+
+  rem a0 r0 r0
+
+  push a0
+
+  push r0 ;; 1st digit (highest)
+  ldlx 10000 r1
+  div r0 r1 a0
+  ldlx putdd1 r0
+  call r0
+  pop r0
+
+  push r0 ;; 2nd digit (highest)
+  ldlx 1000 r1
+  div r0 r1 a0
+  ldlx putdd1 r0
+  call r0
+  pop r0
+
+  push r0 ;; 3rd digit
+  ldlx 100 r1
+  div r0 r1 a0
+  ldlx putdd1 r0
+  call r0
+  pop r0
+
+  push r0 ;; 4th digit
+  ldlx 10 r1
+  div r0 r1 a0
+  ldlx putdd1 r0
+  call r0
+  pop r0
+
+  push r0 ;; 5th digit (lowest)
+  mv r0 a0
+  ldlx putdd r0
+  call r0
+  pop r0
+
+  pop a0
+  ret
+
+putdd1:
+  ldlx putdd r0
+  mve a0 r0 pc
+  ret
+
+putdd:
+  ldlx 10 r0
+  rem a0 r0 r3
+
+  ldhx h7FE0 r0
+
+  ldlx 10 r1
+
+  ;; 0-9
+  addi r3 h30 r1
+  wr8 r0 r1
+  ret

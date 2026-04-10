@@ -1,0 +1,89 @@
+Instructions are always of size of 4 bytes(32 bits).
+Instructions usually follows this form:
+ [opcode:8] [ar:8] [br:8] [cr:8]
+But instructions for which (opcode&0xF0)==0xF0 follows this form:
+ [opcode:8] [  imm:16   ] [cr:8]
+
+kinda microcode:
+ RR(reg) - read a register
+ WR(reg, value) - write to a register
+
+ WRL(reg, value) - write to low 16 bits of a register
+ WRH(reg, value) - write to high 16 bits of a register
+
+ MW8(addr, value) - write 8 bits to memory
+ MW16(addr, value) - write 16 bits to memory
+ MW32(addr, value) - write 32 bits to memory
+
+ MR8(addr, value) - read 8 bits from memory
+ MR16(addr, value) - read 16 bits from memory
+ MR32(addr, value) - read 32 bits from memory
+
+ "Signed" means it will be signed extended to 32 bits.
+ MRS8(addr, value) - read signed 8 bits from memory
+ MRS16(addr, value) - read signed 16 bits from memory
+
+a = RR(ar)
+b = RR(br)
+
+ADD   - 0x00             ; WR(cr, a+b)
+SUB   - 0x01             ; WR(cr, a-b)
+AND   - 0x02             ; WR(cr, a&b)
+OR    - 0x03             ; WR(cr, a|b)
+XOR   - 0x04             ; WR(cr, a^b)
+NAND  - 0x05             ; WR(cr, ~(a&b))
+NOR   - 0x06             ; WR(cr, ~(a|b))
+XNOR  - 0x07             ; WR(cr, ~(a^b))
+NEG   - 0x08 (Ignores b) ; WR(cr, -a)
+NOT   - 0x09 (Ignores b) ; WR(cr, ~a)
+DIV   - 0x0A             ; WR(cr, (u32)a/(u32)b)
+IDIV  - 0x0B             ; WR(cr, (s32)a/(s32)b)
+REM   - 0x0C             ; WR(cr, (u32)a%(u32)b)
+IREM  - 0x0D             ; WR(cr, (s32)a%(s32)b)
+
+WR8   - 0x10             ; MW8(a, b)
+WR16  - 0x11             ; MW16(a, b)
+WR32  - 0x12             ; MW32(a, b)
+
+RD8   - 0x13             ; WR(cr, MR8(a))
+RD16  - 0x14             ; WR(cr, MR16(a))
+RD32  - 0x15             ; WR(cr, MR32(a))
+
+RDS8  - 0x16             ; WR(cr, MRS8(a))
+RDS16 - 0x17             ; WR(cr, MRS16(a))
+
+CMP   - 0x18             ; WR(cr, (
+                                   ((overflow(a * b)) << 10) |
+                                   ((carry(a + b))    << 9)  |
+                                   ((carry(a - b))    << 8)  |
+                                   ((a >u b)          << 7)  |
+                                   ((a <u b)          << 6)  |
+                                   ((a >s b)          << 5)  |
+                                   ((a <s b)          << 4)  |
+                                   ((a != b)          << 3)  |
+                                   ((a == b)          << 2)  |
+                                   ((b == 0)          << 1)  |
+                                   ((a == 0)          << 0))
+
+MV    - 0x19             ; WR(cr, a)
+MVE   - 0x20             ; if (a != 0)            WR(cr, b)
+MVO   - 0x21             ; if (a == 0)            WR(cr, b)
+TSBI  - 0x22             ; WR(cr, (a & (1<<br)) != 0)
+TSI   - 0x23             ; WR(cr, (a & br     ) != 0)
+TSB   - 0x24             ; WR(cr, (a & (1<<b) ) != 0)
+TS    - 0x25             ; WR(cr, (a & b      ) != 0)
+CALL  - 0x26             ; MW32(RR(sp), RR(pc)+4);WR(sp, RR(sp)+4);WR(pc, a)
+RET   - 0x27             ; WR(sp, RR(sp)-4);WR(pc, MR32(RR(sp)))
+PUSH  - 0x28             ; MW32(RR(sp), a);WR(sp, RR(sp)+4)
+POP   - 0x29             ; WR(sp, RR(sp)-4);WR(cr, MR32(RR(sp)))
+
+ANDI  - 0xEA             ; WR(cr, a&br)
+ORI   - 0xEB             ; WR(cr, a|br)
+WAIT  - 0xEC             ; Platform dependent. Do not use if you want to wait for a certain amount of time.
+ADDI  - 0xED             ; WR(cr, a+br)
+HLT   - 0xEE             ; halt
+UDI   - 0xEF             ; reserved to be an invalid instruction
+LDLX  - 0xFC             ; WR(cr, imm)
+LDHX  - 0xFD             ; WR(cr, imm<<16)
+LDL   - 0xFE             ; WRL(cr, imm)
+LDH   - 0xFF             ; WRH(cr, imm)

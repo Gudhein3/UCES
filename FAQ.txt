@@ -1,0 +1,26 @@
+Assembly syntax
+ What do symbols h, b, o before numbers mean?
+  They're marking the number is hexadecimal(h), binary(b), octal(o), or decimal(d).
+  By default all numeric literals are parsed as decimals.
+  But if you want to denote it explicitly, you can place "d" before the numeric literal.
+ How can I find a list of all registers?
+  You can read "ABI.txt".
+ How can I find a full list of all instructions?
+  You can read "INSTS.txt".
+ What pseudo instructions does processor have?
+  There is instructions to put some raw data to a binary:
+   ".db" - put 8 bits
+   ".dw" - put 16 bits
+   ".dd" - put 32 bits
+  To control pointer addressing:
+   ".org" - Change a current address of generating symbols table
+
+
+Architecture
+ Is it based on RISC, CISC, or MISC?
+  Kinda on RISC. But I don't want to make a strictly RISC architecture.
+
+Misc
+ What's a processor knows about MMIO?
+  Nothing, they're mapped by a mother board or a memory controller.
+  So the processor thinks it writes to a normal memory.

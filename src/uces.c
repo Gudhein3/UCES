@@ -220,6 +220,10 @@ int evalute_instruction() {
         break;
     case OP_IREM: WR(cr, (s32)a%(s32)b);
         break;
+    case OP_MUL: WR(cr, (u32)a*(u32)b);
+        break;
+    case OP_IMUL: WR(cr, (s32)a*(s32)b);
+        break;
     case OP_WR8: MW8(a, b);
         break;
     case OP_WR16: MW16(a, b);
@@ -271,6 +275,10 @@ int evalute_instruction() {
     case OP_PUSH: MW32(RR(003), a);WR(003, RR(003)+4);
         break;
     case OP_POP:  WR(003, RR(003)-4);WR(cr, MR32(RR(003)));
+        break;
+    case OP_LSL:  WR(cr, (u32)a<<(u32)b);
+        break;
+    case OP_LSR:  WR(cr, (u32)a>>(u32)b);
         break;
     case OP_ANDI: WR(cr, a&br);
         break;

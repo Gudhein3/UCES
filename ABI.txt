@@ -26,6 +26,11 @@ Function body:
   pop ra
   j ra
 
-MMIO  - 0x7FE00000 - 0x7FFFFFFF
+MMIO devices should use range from 0x7FE00000 to 0x7FFFFFFF (inclusively)
+All address ranges below are inclusive.
+
 UART  - 0x7FE00000 - 0x7FE00000
+    0x7FE00000 - Console input & Console output
+               - Implementation-dependent; Console output must be implemented for debugging purposes
 DRIVE - 0x7FE00010 - 0x7FE000
+    ==============================TBD==============================

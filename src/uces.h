@@ -52,6 +52,8 @@ typedef enum {
     OP_IDIV  = 0x0B,
     OP_REM   = 0x0C,
     OP_IREM  = 0x0D,
+    OP_MUL   = 0x0E,
+    OP_IMUL  = 0x0F,
 
     OP_WR8   = 0x10,
     OP_WR16  = 0x11,
@@ -78,6 +80,9 @@ typedef enum {
     OP_RET   = 0x27,
     OP_PUSH  = 0x28,
     OP_POP   = 0x29,
+
+    OP_LSL   = 0x2A,
+    OP_LSR   = 0x2B,
 
     OP_ANDI  = 0xEA,
     OP_ORI   = 0xEB,

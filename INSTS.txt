@@ -40,6 +40,9 @@ DIV   - 0x0A             ; WR(cr, (u32)a/(u32)b)
 IDIV  - 0x0B             ; WR(cr, (s32)a/(s32)b)
 REM   - 0x0C             ; WR(cr, (u32)a%(u32)b)
 IREM  - 0x0D             ; WR(cr, (s32)a%(s32)b)
+MUL   - 0x0E             ; WR(cr, (u32)a*(u32)b)
+IMUL  - 0x0F             ; WR(cr, (s32)a*(s32)b)
+
 
 WR8   - 0x10             ; MW8(a, b)
 WR16  - 0x11             ; MW16(a, b)
@@ -76,6 +79,11 @@ CALL  - 0x26             ; MW32(RR(sp), RR(pc)+4);WR(sp, RR(sp)+4);WR(pc, a)
 RET   - 0x27             ; WR(sp, RR(sp)-4);WR(pc, MR32(RR(sp)))
 PUSH  - 0x28             ; MW32(RR(sp), a);WR(sp, RR(sp)+4)
 POP   - 0x29             ; WR(sp, RR(sp)-4);WR(cr, MR32(RR(sp)))
+
+LSL   - 0x2A             ; WR(cr, (u32)a<<(u32)b)
+LSR   - 0x2B             ; WR(cr, (u32)a>>(u32)b)
+
+(There is no sence of introducing arithmetic left shift & arithmentic right shift since it could be easily replaced with 'lsl' & 'lsr' respectfully)
 
 ANDI  - 0xEA             ; WR(cr, a&br)
 ORI   - 0xEB             ; WR(cr, a|br)

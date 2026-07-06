@@ -292,7 +292,7 @@ int evalute_instruction() {
         break;
     case OP_HLT:
         return EIS_HALT;
-    case OP_ADDI: WR(cr, a+br);
+    case OP_ADDI: WR(cr, a+(int8_t)br);
         break;
     case OP_LDLX: WR(cr, imm);
         break;

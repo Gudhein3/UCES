@@ -83,12 +83,12 @@ POP   - 0x29             ; WR(sp, RR(sp)-4);WR(cr, MR32(RR(sp)))
 LSL   - 0x2A             ; WR(cr, (u32)a<<(u32)b)
 LSR   - 0x2B             ; WR(cr, (u32)a>>(u32)b)
 
-(There is no sence of introducing arithmetic left shift & arithmentic right shift since it could be easily replaced with 'lsl' & 'lsr' respectfully)
+(There is no reason of introducing arithmetic left & right shifts since they could be easily replaced with 'lsl' & 'lsr')
 
 ANDI  - 0xEA             ; WR(cr, a&br)
 ORI   - 0xEB             ; WR(cr, a|br)
 WAIT  - 0xEC             ; Platform dependent. Do not use if you want to wait for a certain amount of time.
-ADDI  - 0xED             ; WR(cr, a+br)
+ADDI  - 0xED             ; WR(cr, a+(int8_t)br)
 HLT   - 0xEE             ; halt
 UDI   - 0xEF             ; reserved to be an invalid instruction
 LDLX  - 0xFC             ; WR(cr, imm)

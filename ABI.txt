@@ -27,7 +27,7 @@ Function body:
   mv ra pc
 
 MMIO devices should use range from 0x7FE00000 to 0x7FFFFFFF (inclusively)
-All address ranges below are inclusive.
+All address ranges bellow are inclusive.
 
 UART  - 0x7FE00000 - 0x7FE00000
     0x7FE00000 - Console input & Console output

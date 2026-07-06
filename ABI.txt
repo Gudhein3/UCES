@@ -4,10 +4,10 @@ x1            |pc            |Program counter                      | Callee
 x2            |ra            |Return address                       | Caller/Callee
 x3            |sp            |Stack pointer                        | Callee
 x4            |fp            |Frame pointer                        | Callee
-x5            |gv            |Global value                         | -
+x5            |gv            |Global value                         | Caller
 x6            |rv            |Return value                         | Callee
 x7-x15        |a0-a8         |Arguments                            | Callee
-x16-x31       |r0-r15        |General Purpose                      | -
+x16-x31       |r0-r15        |General Purpose                      | Caller
 
 Additional arguments should be pushed to the stack in order from first to last and shouldn't be poped by callee:
 push argument1
@@ -24,7 +24,7 @@ Function body:
   mv fp sp
   pop fp
   pop ra
-  j ra
+  mv ra pc
 
 MMIO devices should use range from 0x7FE00000 to 0x7FFFFFFF (inclusively)
 All address ranges below are inclusive.

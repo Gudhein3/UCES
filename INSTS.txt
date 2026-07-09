@@ -1,8 +1,6 @@
-Instructions are always of size of 4 bytes(32 bits).
-Instructions usually follows this form:
+Instruction length is always 4 bytes(32 bits).
+Instructions usually follow this form:
  [opcode:8] [ar:8] [br:8] [cr:8]
-But instructions for which (opcode&0xF0)==0xF0 follows this form:
- [opcode:8] [  imm:16   ] [cr:8]
 
 kinda microcode:
  RR(reg) - read a register
@@ -15,9 +13,9 @@ kinda microcode:
  MW16(addr, value) - write 16 bits to memory
  MW32(addr, value) - write 32 bits to memory
 
- MR8(addr, value) - read 8 bits from memory
- MR16(addr, value) - read 16 bits from memory
- MR32(addr, value) - read 32 bits from memory
+ MR8(addr) - read 8 bits from memory
+ MR16(addr) - read 16 bits from memory
+ MR32(addr) - read 32 bits from memory
 
  "Signed" means it will be signed extended to 32 bits.
  MRS8(addr, value) - read signed 8 bits from memory
@@ -25,6 +23,7 @@ kinda microcode:
 
 a = RR(ar)
 b = RR(br)
+imm = (br<<8)|ar
 
 ADD   - 0x00             ; WR(cr, a+b)
 SUB   - 0x01             ; WR(cr, a-b)

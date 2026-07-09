@@ -1,4 +1,4 @@
-.PHONY: test all
+.PHONY: test all clear_drive
 
 all: bin/build/uces-emu bin/build/uces-asm
 
@@ -19,6 +19,11 @@ bin/build/sv.o: bin/.gitignore src/sv.c src/sv.h
 
 bin/build/uces-asm: bin/.gitignore src/asm.c src/uces.h bin/build/libasm.o bin/build/sv.o
 	$(CC) $(CFLAGS) -o bin/build/uces-asm src/asm.c bin/build/libasm.o bin/build/sv.o
+
+clear_drive:
+	if [ -e drive.bin ]; then rm drive.bin; fi
+	dd if=/dev/zero of=drive.bin bs=1024 count=4
+
 
 bin/.gitignore:
 	mkdir -p bin/build/

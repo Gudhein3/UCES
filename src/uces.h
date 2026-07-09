@@ -96,3 +96,5 @@ typedef enum {
     OP_LDL   = 0xFE,
     OP_LDH   = 0xFF,
 } OpCode;
+
+int init_dev();

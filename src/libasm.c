@@ -10,7 +10,8 @@ static const char *regnames[] = {
     "gv",
     "rv",
     "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8",
-    "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"
+    "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8", "r9", "r10",
+    "t0", "t1", "t2", "t3", "t4"
 };
 
 #define INST_NOARG (1<<0)
@@ -40,12 +41,12 @@ AsmInst asm_instructions[] = { // Terminated with (AsmInst) {0, 0, NULL}
     (AsmInst) { OP_WR8,   INST_NOOUT, "wr8"   },
     (AsmInst) { OP_WR16,  INST_NOOUT, "wr16"  },
     (AsmInst) { OP_WR32,  INST_NOOUT, "wr32"  },
-    (AsmInst) { OP_RD8,   0,          "rd8"   },
-    (AsmInst) { OP_RD16,  0,          "rd16"  },
-    (AsmInst) { OP_RD32,  0,          "rd32"  },
-    (AsmInst) { OP_RDS8,  0,          "rds8"  },
-    (AsmInst) { OP_RDS16, 0,          "rds16" },
-    (AsmInst) { OP_CMP,   0,          "cmp"   },
+    (AsmInst) { OP_RD8,   INST_NO2A,  "rd8"   },
+    (AsmInst) { OP_RD16,  INST_NO2A,  "rd16"  },
+    (AsmInst) { OP_RD32,  INST_NO2A,  "rd32"  },
+    (AsmInst) { OP_RDS8,  INST_NO2A,  "rds8"  },
+    (AsmInst) { OP_RDS16, INST_NO2A,  "rds16" },
+    (AsmInst) { OP_CMP,   INST_NO2A,  "cmp"   },
     (AsmInst) { OP_MV,    INST_NO2A,  "mv"    },
     (AsmInst) { OP_MVE,   0,          "mve"   },
     (AsmInst) { OP_MVO,   0,          "mvo"   },
@@ -314,19 +315,25 @@ int asm_export_symbols(String_View source_code, SymbolTable *table) {
         sv_trim_left(&line);
         size_t instsize = 0;
         if (tok.size && tok.data[0] == '.') { // Pseudo instructions
-            if (sv_cmp_cstr(tok, ".db")) {
+            if (sv_cmp_cstr(tok, ".db") == 0) {
                 instsize += 1;
             }
-            else if (sv_cmp_cstr(tok, ".dw")) {
+            else if (sv_cmp_cstr(tok, ".dw") == 0) {
                 instsize += 2;
             }
-            else if (sv_cmp_cstr(tok, ".dd")) {
+            else if (sv_cmp_cstr(tok, ".dd") == 0) {
                 instsize += 4;
             }
-            else if (sv_cmp_cstr(tok, ".org")) {
+            else if (sv_cmp_cstr(tok, ".org") == 0) {
                 tok = sv_split_group(&line, isspace);
                 u32 i = asm_parse_numeric(tok);
                 onaddress = i;
+            }
+            else if (sv_cmp_cstr(tok, ".ld") == 0) {
+                instsize += 8;
+            }
+            else if (sv_cmp_cstr(tok, ".if") == 0) {
+                instsize += 12;
             }
             else {
                 panic("Bad pseudo instruction name: %.*s", tok.size, tok.data);
@@ -377,14 +384,14 @@ int assemble(String_View source_code, ByteArray *output, SymbolTable _Nullable *
         sv_trim_left(&line);
         instcode.count = 0;
         if (tok.size && tok.data[0] == '.') { // Pseudo instructions
-            if (sv_cmp_cstr(tok, ".db")) {
+            if (sv_cmp_cstr(tok, ".db") == 0) {
                 u32 i = asm_parse_expr(&line);
                 if (i >= (1<<8)) {
                     warning("Too big 8bit numeric literal", NULL);
                 }
                 da_append(&instcode, i);
             }
-            else if (sv_cmp_cstr(tok, ".dw")) {
+            else if (sv_cmp_cstr(tok, ".dw") == 0) {
                 u32 i = asm_parse_expr(&line);
                 if (i >= (1<<16)) {
                     warning("Too big 16bit numeric literal", NULL);
@@ -392,14 +399,96 @@ int assemble(String_View source_code, ByteArray *output, SymbolTable _Nullable *
                 da_append(&instcode, i&0xFF);
                 da_append(&instcode, (i>>8));
             }
-            else if (sv_cmp_cstr(tok, ".dd")) {
+            else if (sv_cmp_cstr(tok, ".dd") == 0) {
                 u32 i = asm_parse_expr(&line);
                 da_append(&instcode, i&0xFF);
                 da_append(&instcode, (i>>8)&0xFF);
                 da_append(&instcode, (i>>16)&0xFF);
                 da_append(&instcode, (i>>24));
             }
-            else if (sv_cmp_cstr(tok, ".org")) {
+            else if (sv_cmp_cstr(tok, ".ld") == 0) {
+                u32 i = asm_parse_expr(&line);
+                tok = sv_split_group(&line, isspace);
+                int a = asm_get_reg(tok);
+
+                // if ((i & 0xFFFF0000) == i) {
+                //     da_append(&instcode, OP_LDHX);
+                //     da_append(&instcode, (i>>16)&0xFF);
+                //     da_append(&instcode, (i>>24)&0xFF);
+                //     da_append(&instcode, a);
+                // }
+                // else if ((i & 0x0000FFFF) == i) {
+                //     da_append(&instcode, OP_LDLX);
+                //     da_append(&instcode, i&0xFF);
+                //     da_append(&instcode, (i>>8)&0xFF);
+                //     da_append(&instcode, a);
+                // }
+                // else {
+                    da_append(&instcode, OP_LDH);
+                    da_append(&instcode, (i>>16)&0xFF);
+                    da_append(&instcode, (i>>24)&0xFF);
+                    da_append(&instcode, a);
+                    da_append(&instcode, OP_LDL);
+                    da_append(&instcode, i&0xFF);
+                    da_append(&instcode, (i>>8)&0xFF);
+                    da_append(&instcode, a);
+                // }
+            }
+            else if (sv_cmp_cstr(tok, ".if") == 0 ||
+                     sv_cmp_cstr(tok, ".ifn") == 0) {
+                tok = sv_split_group(&line, isspace);
+                int a = asm_get_reg(tok);
+
+                tok = sv_split_group(&line, isspace);
+                int op;
+                if (sv_cmp_cstr(tok, "o*") == 0)
+                    op = 10;
+                else if (sv_cmp_cstr(tok, "c+") == 0)
+                    op = 9;
+                else if (sv_cmp_cstr(tok, "c-") == 0)
+                    op = 8;
+                else if (sv_cmp_cstr(tok, ">u") == 0)
+                    op = 7;
+                else if (sv_cmp_cstr(tok, "<u") == 0)
+                    op = 6;
+                else if (sv_cmp_cstr(tok, ">s") == 0)
+                    op = 5;
+                else if (sv_cmp_cstr(tok, "<s") == 0)
+                    op = 4;
+                else if (sv_cmp_cstr(tok, "!=") == 0)
+                    op = 3;
+                else if (sv_cmp_cstr(tok, "==") == 0 ||
+                         sv_cmp_cstr(tok, "=") == 0)
+                    op = 2;
+
+                tok = sv_split_group(&line, isspace);
+                int b = asm_get_reg(tok);
+                tok = sv_split_group(&line, isspace);
+                int x = asm_get_reg(tok);
+                tok = sv_split_group(&line, isspace);
+                int y = asm_get_reg(tok);
+                // if a OP b y = x;
+                da_append(&instcode, OP_CMP);
+                da_append(&instcode, a);
+                da_append(&instcode, b);
+                da_append(&instcode, 27);
+
+                da_append(&instcode, OP_TSBI);
+                da_append(&instcode, 27);
+                da_append(&instcode, op);
+                da_append(&instcode, 27);
+
+                if (sv_cmp_cstr(tok, ".if") == 0) {
+                    da_append(&instcode, OP_MVE);
+                }
+                else { // .ifn
+                    da_append(&instcode, OP_MVO);
+                }
+                da_append(&instcode, 27);
+                da_append(&instcode, x);
+                da_append(&instcode, y);
+            }
+            else if (sv_cmp_cstr(tok, ".org") == 0) {
                 u32 i = asm_parse_expr(&line);
                 onaddress = i;
             }
@@ -534,6 +623,7 @@ int unassemble(Byte_View bin, String_Builder *sb) {
             pc += 4;
             continue;
         }
+        size_t curr_sb_size = sb->count;
         sb_printf(sb, "%s", inst->name);
         if ((op & 0xF0) == 0xF0) {
             sb_printf(sb, " %u", imm);
@@ -571,7 +661,7 @@ int unassemble(Byte_View bin, String_Builder *sb) {
             sb_printf(sb, " %s", regnames[cr]);
         }
         // TODO: make column adjustable.
-        sb_printf(sb, "\x1b[40G; h%02X h%02X h%02X h%02X\n", bin.data[pc+3], bin.data[pc+2], bin.data[pc+1], bin.data[pc]);
+        sb_printf(sb, "%*s; h%02X h%02X h%02X h%02X\n", 40-(sb->count-curr_sb_size), "", bin.data[pc], bin.data[pc+1], bin.data[pc+2], bin.data[pc+3]);
         pc += 4;
     }
 

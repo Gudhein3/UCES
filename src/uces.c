@@ -20,10 +20,12 @@ static int dmem_peek(u32 addr, u8 *result) {
 static Dev dmem_device = {dmem_poke, dmem_peek};
 
 extern Dev uart_device;
+extern Dev drive_device;
 
 Dev *devices[] = {
-    &dmem_device,
-    &uart_device
+    &uart_device,
+    &drive_device,
+    &dmem_device
 };
 
 VM vm;
@@ -96,22 +98,22 @@ u32 PEEK8(u32 addr) {
         u8 a = 0;
         if (devices[i]->peek(addr, &a)) return a;
     }
-    fault("Memory address %p to a byte doesn't belong to any device", addr);
+    fault("Memory address %p doesn't belong to any device", addr);
 }
 
 u32 PEEK16(u32 addr) {
     if (addr+1 < addr) // Avoid overflows.
-        fault("Invalid memory address to a word: %p: Overflow", addr);
+        fault("Invalid memory address: %p: Overflow", addr);
     for (int i = 0; i < sizeof(devices)/sizeof(*devices); ++i) {
         u8 a = 0, b = 0;
         if (devices[i]->peek(addr, &a) && devices[i]->peek(addr+1, &b)) return (b<<8) | a;
     }
-    fault("Memory address %p to a word doesn't belong to any device", addr);
+    fault("Memory address %p doesn't belong to any device", addr);
 }
 
 u32 PEEK32(u32 addr) {
     if (addr+3 < addr) // Avoid overflows.
-        fault("Invalid memory address to a word: %p: Overflow", addr);
+        fault("Invalid memory address: %p: Overflow", addr);
     for (int i = 0; i < sizeof(devices)/sizeof(*devices); ++i) {
         u8 a = 0, b = 0, c = 0, d = 0;
         if (devices[i]->peek(addr, &a) &&
@@ -123,7 +125,7 @@ u32 PEEK32(u32 addr) {
                 return r;
         }
     }
-    fault("Memory address %p to a dword doesn't belong to any device", addr);
+    fault("Memory address %p doesn't belong to any device", addr);
 }
 
 u32 PEEKS8(u32 addr) {
@@ -316,11 +318,11 @@ int evalute_instruction() {
 
 #define KIB(k, b) (k)*1024+(b)
 #define MIB(m, b) KIB((m)*1024,b)
-#define GIB(g, b) GIB((g)*1024,b)
+#define GIB(g, b) MIB((g)*1024,b)
 #define MEMSIZE MIB(12, 0)
-#define STACK_START (MEMSIZE-KIB(2,0))
+#define STACK_START (MEMSIZE-MIB(1, 0))
 
-#define CSize_Fmt "%uGiB %uMiB %uKiB %uB"
+#define CSize_Fmt "%uGiB%uMib%uKiB%uB"
 
 #define CSIZE_FORMAT(c) ((c)/1024/1024/1024), (((c)/1024/1024)%1024), (((c)/1024)%1024), ((c)%1024)
 
@@ -350,12 +352,12 @@ int main(int argc, char **argv) {
     s32 botest;
     memcpy(&botest, "ABCD", 4);
     if (botest != 0x44434241) {
-        fprintf(stderr, "Sorry, but this software doesn't support big-endian systems.\n");
+        fprintf(stderr, "Sorry, this software doesn't support big-endian systems.\n");
         return 1;
     }
     if (argc != 2) {
         usage(argv[0]);
-        fprintf(stderr, "Expected at 1 argument but got %d\n", argc-1);
+        fprintf(stderr, "Expected 1 argument but got %d\n", argc-1);
         return 2;
     }
     size_t program_size;
@@ -369,6 +371,10 @@ int main(int argc, char **argv) {
     free(program);
     int status;
     String_Builder inst_deasm = {0};
+    if (init_dev() != 0) {
+        fprintf(stderr, "Failed to initialize virtual devices :(\n");
+        return 1;
+    }
     for (;;) {
         // inst_deasm.count = 0;
         // unassemble((Byte_View) {vm.memory+vm.pc, 4}, &inst_deasm);

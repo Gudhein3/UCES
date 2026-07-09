@@ -7,7 +7,8 @@ x4            |fp            |Frame pointer                        | Callee
 x5            |gv            |Global value                         | Caller
 x6            |rv            |Return value                         | Callee
 x7-x15        |a0-a8         |Arguments                            | Callee
-x16-x31       |r0-r15        |General Purpose                      | Caller
+x16-x26       |r0-r10        |General Purpose                      | Callee
+x27-x31       |t0-t4         |Temporal                             | Caller
 
 Additional arguments should be pushed to the stack in order from first to last and shouldn't be poped by callee:
 push argument1
@@ -30,7 +31,9 @@ MMIO devices should use range from 0x7FE00000 to 0x7FFFFFFF (inclusively)
 All address ranges bellow are inclusive.
 
 UART  - 0x7FE00000 - 0x7FE00000
-    0x7FE00000 - Console input & Console output
-               - Implementation-dependent; Console output must be implemented for debugging purposes
-DRIVE - 0x7FE00010 - 0x7FE000
-    ==============================TBD==============================
+    0x7FE00000(1) - Read-Write; console bus
+                  - Implementation-dependent; Should be used exclusively for debugging purposes
+DRIVE - 0x7FE00010 - 0x7FE00020
+    0x7FE00010(4) - Read-Write; 512b sector index(0based)
+    0x7FE00014(1) - Read-only; status (Should be better documented)
+    0x7FE00015(1) - Read-write; bus

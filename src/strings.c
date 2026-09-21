@@ -1,4 +1,9 @@
-#include "sv.h"
+#include "strings.h"
+#include "da.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include <stdarg.h>
+#include <errno.h>
 #include <string.h>
 
 String_View sv_split_char(String_View *sv, char delim) {
@@ -66,4 +71,21 @@ int sv_cmp_sv(String_View a, String_View b) {
         return a.data[b.size-1]-0;
     }
     return strncmp(a.data, b.data, a.size);
+}
+
+void sb_printf(String_Builder *sb, const char *fmt, ...) {
+    va_list list0, list1;
+    va_start(list0, fmt);
+    va_copy(list1, list0);
+    size_t cnt = vsnprintf(NULL, 0, fmt, list0);
+    char *buf = malloc(cnt+1);
+    if (buf == NULL) {
+        fprintf(stderr, "Failed to allocate %zu bytes: %s\n", cnt + 1, strerror(errno));
+        exit(1);
+    }
+    vsnprintf(buf, cnt+1, fmt, list1);
+    da_extend(sb, cnt, buf);
+    free(buf);
+    va_end(list0);
+    va_end(list1);
 }

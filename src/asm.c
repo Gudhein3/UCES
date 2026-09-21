@@ -1,23 +1,5 @@
 #include "libasm.h"
 
-static u8 *_Nullable read_file(const char *filename, size_t *_Nullable size) {
-    FILE *fptr = fopen(filename, "rb");
-    if (!fptr) return NULL;
-    size_t _size;
-    fseek(fptr, 0, SEEK_END);
-    _size = ftell(fptr);
-    fseek(fptr, 0, SEEK_SET);
-    if (size) *size = _size;
-    u8 *buf = malloc(_size);
-    if (!buf) {
-        fclose(fptr);
-        return NULL;
-    }
-    fread(buf, _size, 1, fptr);
-    fclose(fptr);
-    return buf;
-}
-
 void usage(char *prog) {
     fprintf(stderr, "usage: %s:\n"
                     "\tasm [options] <input code> <output binary>\n"

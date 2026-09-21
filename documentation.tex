@@ -1,0 +1,128 @@
+\documentclass{article}
+\begin{document}
+	First of, the main thing in any computer architecture, such as UCES, is its \textit{ISA}(Instruction Set Architecture).
+
+	Translating the word \textit{ISA} to English: \textit{List of all commands your CPU can perform, for example, addition, substruction, memory operations, military grade encryption algorithms, etc}.
+
+	UCES doesn't have some of listed above, but hopefully, it will be enough for most problems you want to solve. \newline
+
+	At the next page you'll find all instruction in standard \textit{UCES}\newline
+
+	But, now, I would like to do some FAQ:
+	\begin{itemize}
+		\item - Why do some instructions accept 3 arguments, while their analogs in \textit{x86\footnote{x86 is a reserved trademark by Intel}} accept only 2?\\
+			- \textit{UCES} is not meant to be x86 compatible; Just read instruction definitions and everything will be clear :-)
+		\item - You're referring to \textit{UCES} using words like \textit{architecture}, \textit{CPU}, does it mean \textit{UCES} has a physical implementation?\\
+			- Nope. I haven't and won't make a physical silicon for \textit{UCES}, because I find it nonsensical, however, \textit{UCES} is open source and public domain, hence, you can freely design a sillicon for it if really want to.
+	\end{itemize}
+
+	\newpage
+	\small
+	\begin{enumerate}
+		\item add $R_0$ $R_1$ $R_2$\\
+			$R_2$ \textleftarrow \space $R_0$ + $R_1$
+		\item sub $R_0$ $R_1$ $R_2$\\
+			$R_2$ \textleftarrow \space $R_0$ - $R_1$
+		\item and $R_0$ $R_1$ $R_2$\\
+			$R_2$ \textleftarrow \space $R_0$ \& $R_1$
+		\item or $R_0$ $R_1$ $R_2$\\
+			$R_2$ \textleftarrow \space $R_0$ \textbar \space $R_1$
+		\item xor $R_0$ $R_1$ $R_2$\\
+			$R_2$ \textleftarrow \space $R_0$ \textasciicircum \space $R_1$
+		\item nand $R_0$ $R_1$ $R_2$\\
+			$R_2$ \textleftarrow \space \textasciitilde($R_0$ \& $R_1$)
+		\item nor $R_0$ $R_1$ $R_2$\\
+			$R_2$ \textleftarrow \space \textasciitilde($R_0$ \textbar \space $R_1$)
+		\item xnor $R_0$ $R_1$ $R_2$\\
+			$R_2$ \textleftarrow \space \textasciitilde($R_0$ \textasciicircum \space $R_1$)
+		\item neg $R_0$ $R_1$\\
+			$R_1$ \textleftarrow \space -$R_0$
+		\item not $R_0$ $R_1$\\
+			$R_1$ \textleftarrow \space \textasciitilde $R_0$
+		\item div $R_0$ $R_1$ $R_2$\\
+			$R_2$ \textleftarrow \space (u32)$R_0$/(u32)$R_1$
+		\item idiv $R_0$ $R_1$ $R_2$\\
+			$R_2$ \textleftarrow \space (s32)$R_0$/(s32)$R_1$
+		\item rem $R_0$ $R_1$ $R_2$\\
+			$R_2$ \textleftarrow \space (u32)$R_0$\%(u32)$R_1$
+		\item irem $R_0$ $R_1$ $R_2$\\
+			$R_2$ \textleftarrow \space (s32)$R_0$\%(s32)$R_1$
+		\item mul $R_0$ $R_1$ $R_2$\\
+			$R_2$ \textleftarrow \space (u32)$R_0$*(u32)$R_1$
+		\item imul $R_0$ $R_1$ $R_2$\\
+			$R_2$ \textleftarrow \space (s32)$R_0$*(s32)$R_1$
+		\item wr\{8, 16, 32\} $R_0$ $R_1$\\
+			$*R_0$ \textleftarrow \space $R_1$
+		\item rd\{8, 16, 32\} $R_0$ $R_1$\\
+			$R_1$ \textleftarrow \space *$R_0$
+		\item rds\{8, 16\} $R_0$ $R_1$\\
+			$R_1$ \textleftarrow \space (s32)*$R_0$
+		\newpage
+		\item cmp $R_0$ $R_1$ $R_2$\\
+			$R_2$ \textleftarrow 0\\
+			if $R_0$ = 0 $R_2$ \textleftarrow \space $R_2$ \textbar \space (1\textless\textless0);\\
+			if $R_1$ = 0 $R_2$ \textleftarrow \space $R_2$ \textbar \space (1\textless\textless1);\\
+			if $R_0$ = $R_1$ $R_2$ \textleftarrow \space $R_2$ \textbar \space (1\textless\textless2);\\
+			if $R_0$ $\neq$ $R_1$ $R_2$ \textleftarrow \space $R_2$ \textbar \space (1\textless\textless3);\\
+			if (s32)$R_0$ \textless \space (s32)$R_1$ $R_2$ \textleftarrow \space $R_2$ \textbar \space (1\textless\textless4);\\
+			if (s32)$R_0$ \textgreater \space (s32)$R_1$ $R_2$ \textleftarrow \space $R_2$ \textbar \space (1\textless\textless5);\\
+			if $R_0$ \textless \space $R_1$ $R_2$ \textleftarrow \space $R_2$ \textbar \space (1\textless\textless6);\\
+			if $R_0$ \textgreater \space $R_1$ $R_2$ \textleftarrow \space $R_2$ \textbar \space (1\textless\textless7);\\
+			if carry($R_0$ - $R_1$) $R_2$ \textleftarrow \space $R_2$ \textbar \space (1\textless\textless8);\\
+			if carry($R_0$ + $R_1$) $R_2$ \textleftarrow \space $R_2$ \textbar \space (1\textless\textless9);\\
+			if overflow($R_0$ * $R_1$) $R_2$ \textleftarrow \space $R_2$ \textbar \space (1\textless\textless10)
+		\item mv $R_0$ $R_1$\\
+			$R_1$ \textleftarrow $R_0$
+		\item mve $R_0$ $R_1$ $R_2$\\
+			if $R_0$ $\neq$ 0 $R_2$ \textleftarrow $R_1$
+		\item mvo $R_0$ $R_1$ $R_2$\\
+			if $R_0$ = 0 $R_2$ \textleftarrow $R_1$
+		\item tsbi $R_0$ $I_1$ $R_2$\\
+			if $R_0$ \& (1\textless\textless$I_1$) = 0 $R_2$ \textleftarrow \space $R_2$ \textbar \space 0;\\
+			else $R_2$ \textleftarrow \space $R_2$ \textbar \space 1
+		\item tsi $R_0$ $I_1$ $R_2$\\
+			if $R_0$ \& $I_1$ = 0 $R_2$ \textleftarrow \space $R_2$ \textbar \space 0;\\
+			else $R_2$ \textleftarrow \space $R_2$ \textbar \space 1
+		\item tsb $R_0$ $R_1$ $R_2$\\
+			if $R_0$ \& (1\textless\textless$R_1$) = 0 $R_2$ \textleftarrow \space $R_2$ \textbar \space 0;\\
+			else $R_2$ \textleftarrow \space $R_2$ \textbar \space 1
+		\item ts $R_0$ $R_1$ $R_2$\\
+			if $R_0$ \& $R_1$ = 0 $R_2$ \textleftarrow \space $R_2$ \textbar \space 0;\\
+			else $R_2$ \textleftarrow \space $R_2$ \textbar \space 1
+		\item call $R_0$\\
+			push(pc+4);\\
+			pc = $R_0$
+		\item ret\\
+			pc = pop()
+		\item push $R_0$\\
+			push($R_0$)
+		\item pop $R_0$\\
+			$R_0$ = pop()
+		\item lsl $R_0$ $R_1$ $R_2$\\
+			$R_2$ \textleftarrow \space $R_0$\textless\textless$R_1$
+		\item lsr $R_0$ $R_1$ $R_2$\\
+			$R_2$ \textleftarrow \space $R_0$\textgreater\textgreater$R_1$
+		\item andi $R_0$ $I_1$ $R_2$\\
+			$R_2$ \textleftarrow \space $R_0$\&$I_1$\&0xFF
+		\item ori $R_0$ $I_1$ $R_2$\\
+			$R_2$ \textleftarrow \space $R_0$\textbar$I_1$\&0xFF
+		\item debug ???\\
+			something()
+			// Effect is decided purely by implementation. Don't use this instruction in production code
+		\item addi $R_0$ $I_1$ $R_2$\\
+			$R_2$ \textleftarrow \space $R_0$+(s8)$I_1$
+		\item hlt\\
+			halt() // Stops execution of current program.
+		\item udi\\
+			trap(undefined instruction)
+		\item ldlx $I_0$ $R_1$\\
+			$R_1$ \textleftarrow \space $I_0$\&0xFFFF
+		\item ldhx $I_0$ $R_1$\\
+			$R_1$ \textleftarrow \space $I_0$\&0xFFFF \textless\textless 16
+		\item ldl $I_0$ $R_1$\\
+			$R_1$ \textleftarrow \space $R_1$\&0xFFFF0000 \textbar \space $I_0$\&0xFFFF
+		\item ldh $I_0$ $R_1$\\
+			$R_1$ \textleftarrow \space $R_1$\&0xFFFF \textbar \space ($I_0$\&0xFFFF \textless\textless 16)
+	\end{enumerate}
+
+\end{document}

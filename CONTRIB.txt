@@ -1,0 +1,67 @@
+I don't recommend using these coding conventions outside of the UCES project, including forks of UCES,
+as I don't want to dictate, or seem dictating other people how to do their business.
+But, I'd recommend following those conventions in your contributions to this project in order to them being accepted.
+
+So, the conventions are following:
+1. Use 4 space tabs
+   Do not write like this:
+   int f() {
+   	return 69;
+   }
+2. Do not use platform-dependent code.
+   UCES is meant be able to work on every 64 bit POSIX(R)-compatible system with cross platform libraries required by the emulator being installed.
+   If you want to use a procedure dependent procedure, such as Linux(R)' `getrandom()`, please consider implementing an abstraction that uses this procedure under the hood for Linux, and its analogs for other systems.
+3. English
+   You are not required to have perfect C1 level, after all, my English is far from best, but in your contributions you should use English in order for people not being forced to decrypt error messages from your language.
+   You may use online translators, or LLM's, as long as the initial text is written a human, and the resulting text is checked by a human.
+4. No Unicode(R)
+   Unicode(R) is not a text format, it's a table of characters, and hence doesn't ensure that a file saved in UTF8 will not render properly in UTF16, or ASCII.
+   Also, POSIX(R) doesn't require implementing Unicode, hence not all system are supporting Unicode(R).
+5. No AI slop
+   You might have heard some statements like "Learn AI to not left behind"(whatever this supposed to mean), I had.
+   Well, I'm not convinced; In my opinion, vibecoding makes codebase only worse.
+   For example, I asked Github Copilot(R) to write code in my language, for sake of curiosity;
+   After a few minutes poking around, it finally produced a code that some reminded the syntax of my language, but after taking a closer look, I noticed that it wasn't calling any procedures, and hence wasn't working.
+   Moral: LLMs cannot learn and like to not addressing their faults.
+   Please do not outsource writing writing code and text for UCES to LLMs;
+   It's disrespectful and the code is mostly dirty.
+6. Do not invent what have been invented before you
+   POSIX(R)' and UCES' internal APIs have a plenty of procedures and macros you may need.
+   Please check POSIX(R)' documentation, and UCES' code before writing a procedure.
+7. Use some sort of readable local variable names
+   Do not name your variables like `steve`, `x1`, `iteratorRequiredByInnerWhileLoopThatsDoingMemoryReporting`.
+   Use snake_case; examples are following:
+   `i`, 'j', 'k' for iterators, `ret`, `result`, `pc`, `ref_counter`, `temparr` - something what an experienced developer can parse in 1 second.
+8. Use readable global names
+   Best practice is to imagine what you expect from an unknown to you library to have name for a procedure you are writing.
+   Use snake_case for procedures and variables, and PascalCase for types.
+   E.g.:
+    You want to implement a procedure that takes a base and returns a logarithm of 2 to the base.
+    Typically logarithm is abbreviated as "log";
+    This procedure returns log2 to the provided base, so the name should be something like "find_log2_to_base".
+9. Do not use features from C standards after C99.
+10. Do not leave trash files in commits.
+    Stuff like `./foo.ubc`, `./HOMEWORK`, `./fib.bin`, `./bin/build` is least thing most people want to see.
+11. Leave comments if something is far from obvious
+    You can even insert some jokes, just make sure that people won't stare at your code and thing what the heck does it suppose to mean.
+12. Don't add new build systems
+    Nobody wants to see CMakeLists.txt, Makefile, build.zig, build.py, etc in one repository.
+    If you want to add build scripts like build.sh, build.bat, it's fine.
+13. Don't add files like AGENTS.md
+    As I mentioned in recommendation #5, I don't like vibecoding, also, presence of these files in the repo can lead to bad reputation among people who dislike.
+14. Separate different logic among different procedures & different modules among different compilation units
+    If your procedure fetches an instruction, executes the instruction, operates on MMIO and parses Lisp, you problably should separate all these actions to fetch_instruction(), execute_instruction(), read_mmio(), parse_list().
+    If you are writing a procedure that parses Lisp for stuff in file uces.c, you probably should create lisp.h and lisp.c for that.
+15. Use proper integral types
+    u8, u16, u32, u64, s8, s16, s32, s64 for integers with specific size.
+    int for small integers with no specific size.
+    size_t, ssize_t for sizes and indexes.
+16. Wrap types with typedef
+    It's annoying to see "struct stat stat;"
+17. Don't add "_t" to the end of types' names
+18. Add include guards to all headers
+    Include guards typically look like:
+    #ifndef _HEADER_INCLUDE
+    #define _HEADER_INCLUDE
+    // Header code
+    #endif // _HEADER_INCLUDE

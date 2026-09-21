@@ -1,26 +1,42 @@
 Assembly syntax
  What do symbols h, b, o before numbers mean?
-  They're marking the number is hexadecimal(h), binary(b), octal(o), or decimal(d).
+  They're marking that the number is either hexadecimal(h), binary(b), octal(o), or decimal(d).
   By default all numeric literals are parsed as decimals.
   But if you want to denote it explicitly, you can place "d" before the numeric literal.
  How can I find a list of all registers?
   You can read "ABI.txt".
  How can I find a full list of all instructions?
   You can read "INSTS.txt".
- What pseudo instructions does processor have?
-  There is instructions to put some raw data to a binary:
-   ".db" - put 8 bits
-   ".dw" - put 16 bits
-   ".dd" - put 32 bits
-  To control pointer addressing:
-   ".org" - Change a current address of generating symbols table
-
+ What pseudo instructions does assembly have?
+  .db CONST - put 8 bits
+  .dw CONST - put 16 bits
+  .dd CONST - put 32 bits
+  .org CONST - Change a current address of generating symbols table
+  .ld CONST REGISTER - Loads a 32 bit integer into a register(Doesn't work with pc for obvious reasons)
+  .if REGA COND REGB REGX REGY - Iff `REGA COND REGB`, copies data from regx to regy, otherwise does nothing;
+                                 Overwrites t0 btw.
+                                 Condition may be one of those:
+                                   `o*`     - does REGA*REGB cause overflow
+                                   `c+`     - does REGA+REGB return carry
+                                   `c-`     - does REGA-REGB return carry
+                                   `>u`     - is REGA unsigned above than REGB
+                                   `<u`     - is REGA unsigned below than REGB
+                                   `>s`     - is REGA signed greater than REGB
+                                   `<s`     - is REGA signed smaller than REGB
+                                   `!=`     - is REGA not equal to REGB
+                                   `==`/`=` - is REGA signed smaller than REGB
 
 Architecture
  Is it based on RISC, CISC, or MISC?
-  Kinda on RISC. But I don't want to make a strictly RISC architecture.
+  Kinda on RISC.
 
 Misc
- What's a processor knows about MMIO?
-  Nothing, they're mapped by a mother board or a memory controller.
-  So the processor thinks it writes to a normal memory.
+ What does UCES processor know about MMIO?
+  Nothing, MMIO devices mapped by memory controller.
+  So the processor calls the memory controller to write into memory, and the controller decides which memory device to call.
+ Can I use UCES in my project/properietary slopware/paper/etc?
+  Yes, UCES is released under Public Domain, you don't even have to even mention me as original author, tho I'd like if you'll mention me.
+ How can I contribute to UCES?
+  Submit a pull request/issue/open a discussion to/at the GitHub repo, following the rules in `CONTRIB.txt`.
+  I'd say upfront, I will not accept AI slop; troll changes; most changes that break code style conventions; changes that break backward compatibility, unless they were discussed with me; and license changes, tho it's obvious.
+  Remember that you can freely fork UCES if your changes weren't accepted.

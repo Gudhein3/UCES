@@ -1,6 +1,10 @@
 ; If you cannot understand something, please consider reading FAQ.txt
 
 ldlx h41 r1 ; Loads value h41 to a register "r1"
+
+; Label
+loop:
+
 ldhx h7FE0 r3 ;; Loads value h7FE00000(UART) to a register "r3"
 
 ; Note:
@@ -17,7 +21,8 @@ ldlx h5B r2
 cmp r2 r1 r2 ;; Compares r1 and r2
 tsbi r2 2 r2 ;; Checks that 2 bit(equality flag of "cmp" instruction) is set.
 
-ldlx 4 r3
+; Write 32 bit immediate to a register
+.ld loop r3
 
 mvo r2 r3 pc ;; Moves value from r3 to pc only if value in r2 == 0
 

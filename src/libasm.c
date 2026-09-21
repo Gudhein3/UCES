@@ -1,7 +1,7 @@
 #include "libasm.h"
 #include <assert.h>
 
-static const char *regnames[] = {
+const char *regnames[] = {
     "zero",
     "pc",
     "ra",
@@ -46,7 +46,7 @@ AsmInst asm_instructions[] = { // Terminated with (AsmInst) {0, 0, NULL}
     (AsmInst) { OP_RD32,  INST_NO2A,  "rd32"  },
     (AsmInst) { OP_RDS8,  INST_NO2A,  "rds8"  },
     (AsmInst) { OP_RDS16, INST_NO2A,  "rds16" },
-    (AsmInst) { OP_CMP,   INST_NO2A,  "cmp"   },
+    (AsmInst) { OP_CMP,   0,          "cmp"   },
     (AsmInst) { OP_MV,    INST_NO2A,  "mv"    },
     (AsmInst) { OP_MVE,   0,          "mve"   },
     (AsmInst) { OP_MVO,   0,          "mvo"   },
@@ -62,7 +62,7 @@ AsmInst asm_instructions[] = { // Terminated with (AsmInst) {0, 0, NULL}
     (AsmInst) { OP_LSR,   0,          "lsr"   },
     (AsmInst) { OP_ANDI,  INST_2IMM,  "andi"  },
     (AsmInst) { OP_ORI,   INST_2IMM,  "ori"   },
-    (AsmInst) { OP_WAIT,  INST_STND,  "wait"  },
+    (AsmInst) { OP_DEBUG, INST_STND,  "debug" },
     (AsmInst) { OP_HLT,   INST_STND,  "hlt"   },
     (AsmInst) { OP_UDI,   INST_STND,  "udi"   },
     (AsmInst) { OP_ADDI,  INST_2IMM,  "addi"  },
@@ -81,6 +81,8 @@ static _Thread_local int lineno;
 static _Thread_local ByteArray instcode;
 static _Thread_local SymbolTable *symbols;
 static _Thread_local size_t onaddress; // Address on which pc currently should be if the program is loaded correctly to memory.
+
+#undef panic
 
 #define panic(fmt, ...) do {fprintf(stderr, "\x1b[31mPanic at \""__FILE__":"__STR(__LINE__)"\" for \"%s:%d\"\x1b[0m: "fmt"\n", srcfile, lineno+1, __VA_ARGS__); abort();} while(0)
 
@@ -296,7 +298,7 @@ int asm_export_symbols(String_View source_code, SymbolTable *table) {
         if (tok.size && tok.data[tok.size-1] == ':') {
             tok.size -= 1;
             SymbolType type = ASM_SYMBOL_LOCAL;
-            if (tok.size && tok.data[tok.size-1] == ':') { // Ending with "::" makes the symbol global.
+            if (tok.size && tok.data[tok.size-1] == ':') { // "::" at end mean the symbol is global.
                 type = ASM_SYMBOL_GLOBAL;
                 tok.size -= 1;
             }
@@ -317,6 +319,8 @@ int asm_export_symbols(String_View source_code, SymbolTable *table) {
         if (tok.size && tok.data[0] == '.') { // Pseudo instructions
             if (sv_cmp_cstr(tok, ".db") == 0) {
                 instsize += 1;
+            }
+            else if (sv_cmp_cstr(tok, ".dp") == 0) {
             }
             else if (sv_cmp_cstr(tok, ".dw") == 0) {
                 instsize += 2;
@@ -391,6 +395,10 @@ int assemble(String_View source_code, ByteArray *output, SymbolTable _Nullable *
                 }
                 da_append(&instcode, i);
             }
+            else if  (sv_cmp_cstr(tok, ".dp") == 0) {
+                u32 i = asm_parse_expr(&line);
+                printf(".dp: %zu\n", i);
+            }
             else if (sv_cmp_cstr(tok, ".dw") == 0) {
                 u32 i = asm_parse_expr(&line);
                 if (i >= (1<<16)) {
@@ -436,6 +444,7 @@ int assemble(String_View source_code, ByteArray *output, SymbolTable _Nullable *
             }
             else if (sv_cmp_cstr(tok, ".if") == 0 ||
                      sv_cmp_cstr(tok, ".ifn") == 0) {
+                int negative = sv_cmp_cstr(tok, ".ifn") == 0;
                 tok = sv_split_group(&line, isspace);
                 int a = asm_get_reg(tok);
 
@@ -460,6 +469,9 @@ int assemble(String_View source_code, ByteArray *output, SymbolTable _Nullable *
                 else if (sv_cmp_cstr(tok, "==") == 0 ||
                          sv_cmp_cstr(tok, "=") == 0)
                     op = 2;
+                else {
+                    panic("Unknown condition: %.*s", tok.size, tok.data);
+                }
 
                 tok = sv_split_group(&line, isspace);
                 int b = asm_get_reg(tok);
@@ -478,7 +490,7 @@ int assemble(String_View source_code, ByteArray *output, SymbolTable _Nullable *
                 da_append(&instcode, op);
                 da_append(&instcode, 27);
 
-                if (sv_cmp_cstr(tok, ".if") == 0) {
+                if (!negative) {
                     da_append(&instcode, OP_MVE);
                 }
                 else { // .ifn
@@ -588,24 +600,6 @@ int assemble(String_View source_code, ByteArray *output, SymbolTable _Nullable *
 
 #include <stdarg.h>
 
-// TODO: Move to its own module.
-static void sb_printf(String_Builder *sb, const char *fmt, ...) {
-    va_list list0, list1;
-    va_start(list0, fmt);
-    va_copy(list1, list0);
-    size_t cnt = vsnprintf(NULL, 0, fmt, list0);
-    char *buf = malloc(cnt+1);
-    if (buf == NULL) {
-        fprintf(stderr, "Failed to allocate %zu bytes: BUY MORE RAM FOR $499.89!!!\n", cnt+1);
-        exit(1);
-    }
-    vsnprintf(buf, cnt+1, fmt, list1);
-    da_extend(sb, cnt, buf);
-    free(buf);
-    va_end(list0);
-    va_end(list1);
-}
-
 int unassemble(Byte_View bin, String_Builder *sb) {
     size_t pc = 0;
     while (pc < bin.size) {
@@ -660,8 +654,7 @@ int unassemble(Byte_View bin, String_Builder *sb) {
         else {
             sb_printf(sb, " %s", regnames[cr]);
         }
-        // TODO: make column adjustable.
-        sb_printf(sb, "%*s; h%02X h%02X h%02X h%02X\n", 40-(sb->count-curr_sb_size), "", bin.data[pc], bin.data[pc+1], bin.data[pc+2], bin.data[pc+3]);
+        sb_printf(sb, "%*s; h%02X h%02X h%02X h%02X at h%02X\n", 40-(sb->count-curr_sb_size), "", bin.data[pc], bin.data[pc+1], bin.data[pc+2], bin.data[pc+3], pc);
         pc += 4;
     }
 

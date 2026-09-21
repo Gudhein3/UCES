@@ -5,7 +5,7 @@ loop:
   push r1
   push r2
   mv r1 a0
-  ldlx putd r0
+  .ld putd r0
   call r0
   pop r2
   pop r1
@@ -21,13 +21,12 @@ loop:
   ldlx 100 r3
   cmp r1 r3 r3
   tsbi r3 7 r3
-  ldlx loop r4
+  .ld loop r4
   mvo r3 r4 pc
   hlt
 
 putd::
-  ldl h86A0 r0 ;; 100000
-  ldh h0001 r0
+  .ld 100000 r0
 
   rem a0 r0 r0
 
@@ -36,34 +35,34 @@ putd::
   push r0 ;; 1st digit (highest)
   ldlx 10000 r1
   div r0 r1 a0
-  ldlx putdd1 r0
+  .ld putdd1 r0
   call r0
   pop r0
 
   push r0 ;; 2nd digit (highest)
   ldlx 1000 r1
   div r0 r1 a0
-  ldlx putdd1 r0
+  .ld putdd1 r0
   call r0
   pop r0
 
   push r0 ;; 3rd digit
   ldlx 100 r1
   div r0 r1 a0
-  ldlx putdd1 r0
+  .ld putdd1 r0
   call r0
   pop r0
 
   push r0 ;; 4th digit
   ldlx 10 r1
   div r0 r1 a0
-  ldlx putdd1 r0
+  .ld putdd1 r0
   call r0
   pop r0
 
   push r0 ;; 5th digit (lowest)
   mv r0 a0
-  ldlx putdd r0
+  .ld putdd r0
   call r0
   pop r0
 
@@ -71,7 +70,7 @@ putd::
   ret
 
 putdd1:
-  ldlx putdd r0
+  .ld putdd r0
   mve a0 r0 pc
   ret
 

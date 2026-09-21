@@ -1,6 +1,8 @@
 #pragma once
 #include "uces.h"
-#include "sv.h"
+#include "da.h"
+#include "cpu.h"
+#include "strings.h"
 
 #define INST_NOARG (1<<0)
 #define INST_NOOUT (1<<1)
@@ -30,12 +32,6 @@ typedef struct {
     size_t size;
 } Byte_View;
 
-typedef struct {
-    char *items;
-    size_t count;
-    size_t capacity;
-} String_Builder;
-
 typedef enum {
     ASM_SYMBOL_LOCAL = 0,
     ASM_SYMBOL_GLOBAL = 1,
@@ -52,29 +48,7 @@ typedef struct {
     size_t count, capacity;
 } SymbolTable;
 
-#define DA_INITIAL_CAPACITY 256
-
-#define da_append(xs, x)                                                             \
-    do {                                                                             \
-        if ((xs)->count >= (xs)->capacity) {                                         \
-            if ((xs)->capacity == 0) (xs)->capacity = DA_INITIAL_CAPACITY;           \
-            else (xs)->capacity += (xs)->capacity>>1;                                \
-            (xs)->items = realloc((xs)->items, (xs)->capacity*sizeof(*(xs)->items)); \
-        }                                                                            \
-        (xs)->items[(xs)->count++] = (x);                                            \
-    } while (0)
-
-#define da_extend(xs, xc, x)                                                         \
-    do {                                                                             \
-        if ((xs)->count+(xc) >= (xs)->capacity) {                                    \
-            if ((xs)->capacity == 0) (xs)->capacity = DA_INITIAL_CAPACITY;           \
-            else (xs)->capacity += ((xs)->capacity>>1) + (xc);                       \
-            (xs)->items = realloc((xs)->items, (xs)->capacity*sizeof(*(xs)->items)); \
-        }                                                                            \
-        memcpy((xs)->items+(xs)->count, (x), xc);                                    \
-        (xs)->count += (xc);                                                         \
-    } while (0)
-
+extern const char *regnames[];
 extern AsmInst asm_instructions[]; // Terminated with (AsmInst) {0, 0, NULL}
 int asm_export_symbols(String_View source_code, SymbolTable *table);
 int assemble(String_View source_code, ByteArray *output, SymbolTable _Nullable *symbols_table);

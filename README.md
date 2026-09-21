@@ -8,11 +8,11 @@
 # Credits
 The source code of assembler and emulator, and architecture specifications are released under [Public Domain](./LICENSE).
 ## Maintainers
-[Nikolay Shevelko(a.k.a. Gudhein3)](https://github.com/gudhein3):
-    Emulator
-    Assembler
-    Architecture
-    Documentation
+[Nikolay Shevelko(a.k.a. Gudhein3)](https://github.com/gudhein3):\
+    Emulator                                                     \
+    Assembler                                                    \
+    Architecture                                                 \
+    Documentation                                                \
     Examples
 ## Specific thanks
 [HunderedRabits](https://100r.co/site/about.html): \

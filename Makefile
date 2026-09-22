@@ -33,4 +33,3 @@ clear:
 	rm -rf bin/
 
 include $(dependency_files)
-include bin/build/cpu.d

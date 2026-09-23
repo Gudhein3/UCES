@@ -1,0 +1,208 @@
+// Meant to be included by cpu.c
+define_instruction(add) {
+    WR(cr, a+b);
+    return 0;
+}
+define_instruction(sub) {
+    WR(cr, a-b);
+    return 0;
+}
+define_instruction(and) {
+    WR(cr, a&b);
+    return 0;
+}
+define_instruction(or) {
+    WR(cr, a|b);
+    return 0;
+}
+define_instruction(xor) {
+    WR(cr, a^b);
+    return 0;
+}
+define_instruction(nand) {
+    WR(cr, ~(a&b));
+    return 0;
+}
+define_instruction(nor) {
+    WR(cr, ~(a|b));
+    return 0;
+}
+define_instruction(xnor) {
+    WR(cr, ~(a^b));
+    return 0;
+}
+define_instruction(neg) {
+    WR(cr, -a);
+    return 0;
+}
+define_instruction(not) {
+    WR(cr, ~a);
+    return 0;
+}
+define_instruction(div) {
+    WR(cr, (u32)a/(u32)b);
+    return 0;
+}
+define_instruction(idiv) {
+    WR(cr, (s32)a/(s32)b);
+    return 0;
+}
+define_instruction(rem) {
+    WR(cr, (u32)a%(u32)b);
+    return 0;
+}
+define_instruction(irem) {
+    WR(cr, (s32)a%(s32)b);
+    return 0;
+}
+define_instruction(mul) {
+    WR(cr, (u32)a*(u32)b);
+    return 0;
+}
+define_instruction(imul) {
+    WR(cr, (s32)a*(s32)b);
+    return 0;
+}
+define_instruction(wr8) {
+    MW8(a, b);
+    return 0;
+}
+define_instruction(wr16) {
+    MW16(a, b);
+    return 0;
+}
+define_instruction(wr32) {
+    MW32(a, b);
+    return 0;
+}
+define_instruction(rd8) {
+    WR(cr, MR8(a));
+    return 0;
+}
+define_instruction(rd16) {
+    WR(cr, MR16(a));
+    return 0;
+}
+define_instruction(rd32) {
+    WR(cr, MR32(a));
+    return 0;
+}
+define_instruction(rds8) {
+    WR(cr, MRS8(a));
+    return 0;
+}
+define_instruction(rds16) {
+    WR(cr, MRS16(a));
+    return 0;
+}
+define_instruction(cmp) {
+    WR(cr, (
+        ((a!=0 && (a*b)/a!=b)  << 10) | // Overflow
+        (((a + b) < a)         << 9)  | // Carry
+        (((a - b) < a)         << 8)  | // Carry
+        ((a >  b)              << 7)  |
+        ((a <  b)              << 6)  |
+        (((s32)a > (s32)b)     << 5)  |
+        (((s32)a < (s32)b)     << 4)  |
+        ((a != b)              << 3)  |
+        ((a == b)              << 2)  |
+        ((b == 0)              << 1)  |
+        ((a == 0)              << 0)));
+        return 0;
+}
+define_instruction(mv) {
+    WR(cr, a);
+    return 0;
+}
+define_instruction(mve) {
+    if (a != 0)            WR(cr, b);
+    return 0;
+}
+define_instruction(mvo) {
+    if (a == 0)            WR(cr, b);
+    return 0;
+}
+define_instruction(tsbi) {
+    WR(cr, (a & (1<<br)) != 0);
+    return 0;
+}
+define_instruction(tsi) {
+    WR(cr, (a & br     ) != 0);
+    return 0;
+}
+define_instruction(tsb) {
+    WR(cr, (a & (1<<b) ) != 0);
+    return 0;
+}
+define_instruction(ts) {
+    WR(cr, (a & b      ) != 0);
+    return 0;
+}
+// NOTE: Register 003 is the stack pointer and 001 is the program counter.
+define_instruction(call) {
+    MW32(RR(003), vm.pc+4);WR(003, RR(003)+4);WR(001, a);
+    return 0;
+}
+define_instruction(ret) {
+    WR(003, RR(003)-4);WR(001, MR32(RR(003)));
+    return 0;
+}
+define_instruction(push) {
+    MW32(RR(003), a);WR(003, RR(003)+4);
+    return 0;
+}
+define_instruction(pop) {
+    WR(003, RR(003)-4);WR(cr, MR32(RR(003)));
+    return 0;
+}
+define_instruction(lsl) {
+    WR(cr, (u32)a<<(u32)b);
+    return 0;
+}
+define_instruction(lsr) {
+    WR(cr, (u32)a>>(u32)b);
+    return 0;
+}
+define_instruction(andi) {
+    WR(cr, a&br);
+    return 0;
+}
+define_instruction(ori) {
+    WR(cr, a|br);
+    return 0;
+}
+define_instruction(debug) {
+    if (DBG >= 1) {
+        FILE *fptr = fopen("memory-dump.bin", "wb");
+        fwrite(vm.memory, 1, vm.memory_size, fptr);
+        fclose(fptr);
+        dump();
+        printf("Press enter to continue: ");
+        fflush(stdout);
+        getchar();
+    }
+    return 0;
+}
+define_instruction(hlt) {
+    return EIS_HALT;
+}
+define_instruction(addi) {
+    WR(cr, a+(int8_t)br);
+    return 0;
+}
+define_instruction(ldlx) {
+    WR(cr, imm);
+    return 0;
+}
+define_instruction(ldhx) {
+    WR(cr, imm<<16);
+    return 0;
+}
+define_instruction(ldl) {
+    WRl(cr, imm);
+    return 0;
+}
+define_instruction(ldh) {
+    WRh(cr, imm);
+    return 0;
+}

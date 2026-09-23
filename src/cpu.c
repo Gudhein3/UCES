@@ -78,6 +78,62 @@ void fetch_instruction(u32 pc, OpCode *op, u8 *ar, u8 *br, u8 *cr, u16 *imm) {
     *imm = ((u16)*br<<8)|(u16)*ar;
 }
 
+typedef EIS(*CpuInstImpl)(u8 ar, u8 br, u8 cr, u32 a, u32 b, u16 imm);
+
+#define define_instruction(name) static EIS cpu_##name(u8 ar, u8 br, u8 cr, u32 a, u32 b, u16 imm)
+
+#include "insts.c.in"
+
+static CpuInstImpl procedure_array[256] = {
+    [OP_ADD]   = cpu_add,
+    [OP_SUB]   = cpu_sub,
+    [OP_AND]   = cpu_and,
+    [OP_OR]    = cpu_or,
+    [OP_XOR]   = cpu_xor,
+    [OP_NAND]  = cpu_nand,
+    [OP_NOR]   = cpu_nor,
+    [OP_XNOR]  = cpu_xnor,
+    [OP_NEG]   = cpu_neg,
+    [OP_NOT]   = cpu_not,
+    [OP_DIV]   = cpu_div,
+    [OP_IDIV]  = cpu_idiv,
+    [OP_REM]   = cpu_rem,
+    [OP_IREM]  = cpu_irem,
+    [OP_MUL]   = cpu_mul,
+    [OP_IMUL]  = cpu_imul,
+    [OP_WR8]   = cpu_wr8,
+    [OP_WR16]  = cpu_wr16,
+    [OP_WR32]  = cpu_wr32,
+    [OP_RD8]   = cpu_rd8,
+    [OP_RD16]  = cpu_rd16,
+    [OP_RD32]  = cpu_rd32,
+    [OP_RDS8]  = cpu_rds8,
+    [OP_RDS16] = cpu_rds16,
+    [OP_CMP]   = cpu_cmp,
+    [OP_MV]    = cpu_mv,
+    [OP_MVE]   = cpu_mve,
+    [OP_MVO]   = cpu_mvo,
+    [OP_TSBI]  = cpu_tsbi,
+    [OP_TSI]   = cpu_tsi,
+    [OP_TSB]   = cpu_tsb,
+    [OP_TS]    = cpu_ts,
+    [OP_CALL]  = cpu_call,
+    [OP_RET]   = cpu_ret,
+    [OP_PUSH]  = cpu_push,
+    [OP_POP]   = cpu_pop,
+    [OP_LSL]   = cpu_lsl,
+    [OP_LSR]   = cpu_lsr,
+    [OP_ANDI]  = cpu_andi,
+    [OP_ORI]   = cpu_ori,
+    [OP_DEBUG] = cpu_debug,
+    [OP_ADDI]  = cpu_addi,
+    [OP_HLT]   = cpu_hlt,
+    [OP_LDLX]  = cpu_ldlx,
+    [OP_LDHX]  = cpu_ldhx,
+    [OP_LDL]   = cpu_ldl,
+    [OP_LDH]   = cpu_ldh
+};
+
 int cpu_tick() {
     is_pc_rewritten = 0;
     OpCode op;
@@ -90,126 +146,12 @@ int cpu_tick() {
     b = RR(br);
     u32 orig_pc = vm.pc;
 
-    switch (op) {
-    case OP_ADD: WR(cr, a+b);
-        break;
-    case OP_SUB: WR(cr, a-b);
-        break;
-    case OP_AND: WR(cr, a&b);
-        break;
-    case OP_OR: WR(cr, a|b);
-        break;
-    case OP_XOR: WR(cr, a^b);
-        break;
-    case OP_NAND: WR(cr, ~(a&b));
-        break;
-    case OP_NOR: WR(cr, ~(a|b));
-        break;
-    case OP_XNOR: WR(cr, ~(a^b));
-        break;
-    case OP_NEG: WR(cr, -a);
-        break;
-    case OP_NOT: WR(cr, ~a);
-        break;
-    case OP_DIV: WR(cr, (u32)a/(u32)b);
-        break;
-    case OP_IDIV: WR(cr, (s32)a/(s32)b);
-        break;
-    case OP_REM: WR(cr, (u32)a%(u32)b);
-        break;
-    case OP_IREM: WR(cr, (s32)a%(s32)b);
-        break;
-    case OP_MUL: WR(cr, (u32)a*(u32)b);
-        break;
-    case OP_IMUL: WR(cr, (s32)a*(s32)b);
-        break;
-    case OP_WR8: MW8(a, b);
-        break;
-    case OP_WR16: MW16(a, b);
-        break;
-    case OP_WR32: MW32(a, b);
-        break;
-    case OP_RD8: WR(cr, MR8(a));
-        break;
-    case OP_RD16: WR(cr, MR16(a));
-        break;
-    case OP_RD32: WR(cr, MR32(a));
-        break;
-    case OP_RDS8: WR(cr, MRS8(a));
-        break;
-    case OP_RDS16: WR(cr, MRS16(a));
-        break;
-    case OP_CMP: WR(cr, (
-                         ((a!=0 && (a*b)/a!=b)  << 10) | // Overflow
-                         (((a + b) < a)         << 9)  | // Carry
-                         (((a - b) < a)         << 8)  | // Carry
-                         ((a >  b)              << 7)  |
-                         ((a <  b)              << 6)  |
-                         (((s32)a > (s32)b)     << 5)  |
-                         (((s32)a < (s32)b)     << 4)  |
-                         ((a != b)              << 3)  |
-                         ((a == b)              << 2)  |
-                         ((b == 0)              << 1)  |
-                         ((a == 0)              << 0)));
-        break;
-    case OP_MV: WR(cr, a);
-        break;
-    case OP_MVE: if (a != 0)            WR(cr, b);
-        break;
-    case OP_MVO: if (a == 0)            WR(cr, b);
-        break;
-    case OP_TSBI: WR(cr, (a & (1<<br)) != 0);
-        break;
-    case OP_TSI:  WR(cr, (a & br     ) != 0);
-        break;
-    case OP_TSB:  WR(cr, (a & (1<<b) ) != 0);
-        break;
-    case OP_TS:   WR(cr, (a & b      ) != 0);
-        break;
-        // NOTE: Register 003 is the stack pointer and 001 is the program counter.
-    case OP_CALL: MW32(RR(003), vm.pc+4);WR(003, RR(003)+4);WR(001, a);
-        break;
-    case OP_RET:  WR(003, RR(003)-4);WR(001, MR32(RR(003)));
-        break;
-    case OP_PUSH: MW32(RR(003), a);WR(003, RR(003)+4);
-        break;
-    case OP_POP:  WR(003, RR(003)-4);WR(cr, MR32(RR(003)));
-        break;
-    case OP_LSL:  WR(cr, (u32)a<<(u32)b);
-        break;
-    case OP_LSR:  WR(cr, (u32)a>>(u32)b);
-        break;
-    case OP_ANDI: WR(cr, a&br);
-        break;
-    case OP_ORI: WR(cr, a|br);
-        break;
-    case OP_DEBUG:
-        if (DBG >= 1) {
-            FILE *fptr = fopen("memory-dump.bin", "wb");
-            fwrite(vm.memory, 1, vm.memory_size, fptr);
-            fclose(fptr);
-            dump();
-            printf("Press enter to continue: ");
-            fflush(stdout);
-            getchar();
-        }
-        break;
-    case OP_HLT:
-        return EIS_HALT;
-    case OP_ADDI: WR(cr, a+(int8_t)br);
-        break;
-    case OP_LDLX: WR(cr, imm);
-        break;
-    case OP_LDHX: WR(cr, imm<<16);
-        break;
-    case OP_LDL:
-        WRl(cr, imm);
-        break;
-    case OP_LDH:
-        WRh(cr, imm);
-        break;
-    case OP_UDI:
-    default:
+    CpuInstImpl procedure = procedure_array[op & 255];
+    if (procedure) {
+        EIS res = procedure(ar, br, cr, a, b, imm);
+        if (res != 0) return res;
+    }
+    else {
         fault("Illegal instruction: 0x%02X at 0x%08X", op, vm.pc);
     }
     if (is_pc_rewritten == 1) {

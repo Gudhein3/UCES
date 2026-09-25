@@ -88,64 +88,11 @@ static _Thread_local size_t onaddress; // Address on which pc currently should b
 
 #define warning(fmt, ...) do {fprintf(stderr, "\x1b[33mWarning at \""__FILE__":"__STR(__LINE__)"\" for \"%s:%d\"\x1b[0m: "fmt"\n", srcfile, lineno+1, __VA_ARGS__); } while(0)
 
+// Dirty
+u32 asm_parse_expr(String_View *line);
+
 u32 asm_parse_numeric(String_View token) {
-    if (token.size == 0) {
-        panic("Expected numeric but got empty token\n", NULL);
-    }
-    u32 i = 0;
-    size_t idx = 0;
-    int neg = 0;
-    if (token.data[0] == '-') {
-        idx += 1;
-        neg = 1;
-    }
-    int system = 0;
-    switch (tolower(token.data[0])) {
-    case 'h':
-        system = 1;
-        idx += 1;
-        break;
-    case 'b':
-        system = 2;
-        idx += 1;
-        break;
-    case 'o':
-        system = 3;
-        idx += 1;
-        break;
-    case 'd': // Explicitly use decimal system
-    default: // Implicitly use decimal system
-    }
-    while (idx < token.size) {
-        if (system == 0) {
-            if (isdigit(token.data[idx])) {
-                i = i*10+token.data[idx]-'0';
-            }
-        }
-        else if (system == 1) {
-            if ('0' <= token.data[idx] && token.data[idx] <= '9') {
-                i = i*16+token.data[idx]-'0';
-            }
-            else if ('a' <= token.data[idx] && token.data[idx] <= 'f') {
-                i = i*16+token.data[idx]-'a'+10;
-            }
-            else if ('A' <= token.data[idx] && token.data[idx] <= 'F') {
-                i = i*16+token.data[idx]-'A'+10;
-            }
-        }
-        else if (system == 2) {
-            if ('0' <= token.data[idx] && token.data[idx] <= '1') {
-                i = i*2+token.data[idx]-'0';
-            }
-        }
-        else if (system == 3) {
-            if ('0' <= token.data[idx] && token.data[idx] <= '7') {
-                i = i*8+token.data[idx]-'0';
-            }
-        }
-        idx += 1;
-    }
-    return neg ? -i : i;
+    return asm_parse_expr(&token);
 }
 
 static int asm_parse_primary_terminator(int x) {
@@ -154,6 +101,9 @@ static int asm_parse_primary_terminator(int x) {
 
 u32 asm_parse_primary(String_View *line) {
     String_View token = sv_split_group(line, asm_parse_primary_terminator);
+    // Dirty hack to prevent chopping operator
+    line->size++;
+    line->data--;
     if (token.size == 0) {
         panic("Expected numeric or symbol name but got empty token\n", NULL);
     }
@@ -221,7 +171,20 @@ u32 asm_parse_primary(String_View *line) {
 }
 
 u32 asm_parse_expr(String_View *line) {
-    return asm_parse_primary(line);
+    u32 value = asm_parse_primary(line);
+    sv_trim_left(line);
+    while (line->size != 0) {
+        if (line->data[0] == '+') {
+            line->size--;
+            line->data++;
+            value += asm_parse_primary(line);
+        }
+        else {
+            break;
+        }
+        sv_trim_left(line);
+    }
+    return value;
 }
 
 u32 asm_get_imm(String_View *line) {
@@ -262,24 +225,6 @@ AsmInst *_Nullable asm_get_inst_by_op(OpCode op) {
     return NULL;
 }
 
-static u8 *_Nullable asm_read_file(const char *filename, size_t *_Nullable size) {
-    FILE *fptr = fopen(filename, "rb");
-    if (!fptr) return NULL;
-    size_t _size;
-    fseek(fptr, 0, SEEK_END);
-    _size = ftell(fptr);
-    fseek(fptr, 0, SEEK_SET);
-    if (size) *size = _size;
-    u8 *buf = malloc(_size);
-    if (!buf) {
-        fclose(fptr);
-        return NULL;
-    }
-    fread(buf, _size, 1, fptr);
-    fclose(fptr);
-    return buf;
-}
-
 // #define DEBUG
 
 int asm_export_symbols(String_View source_code, SymbolTable *table) {
@@ -293,7 +238,7 @@ int asm_export_symbols(String_View source_code, SymbolTable *table) {
         sv_trim_right(&line);
         if (line.size == 0) continue;
 
-        String_View tok = sv_split_group(&line, isspace); // Chopping a token.
+        String_View tok = sv_split_group(&line, isspace); sv_trim_left(&line); // Chopping a token.
 
         if (tok.size && tok.data[tok.size-1] == ':') {
             tok.size -= 1;
@@ -329,7 +274,7 @@ int asm_export_symbols(String_View source_code, SymbolTable *table) {
                 instsize += 4;
             }
             else if (sv_cmp_cstr(tok, ".org") == 0) {
-                tok = sv_split_group(&line, isspace);
+                tok = sv_split_group(&line, isspace); sv_trim_left(&line);
                 u32 i = asm_parse_numeric(tok);
                 onaddress = i;
             }
@@ -338,6 +283,18 @@ int asm_export_symbols(String_View source_code, SymbolTable *table) {
             }
             else if (sv_cmp_cstr(tok, ".if") == 0) {
                 instsize += 12;
+            }
+            else if (sv_cmp_cstr(tok, ".str") == 0) {
+                for (size_t i = 0; i < line.size; ++i) {
+                    if (line.data[i] == '\\') {
+                        ++i;
+                        // Assume that after the '\' symbol is followed by only one additional symbol.
+                        instsize += 1;
+                    }
+                    else {
+                        instsize += 1;
+                    }
+                }
             }
             else {
                 panic("Bad pseudo instruction name: %.*s", tok.size, tok.data);
@@ -375,7 +332,7 @@ int assemble(String_View source_code, ByteArray *output, SymbolTable _Nullable *
         sv_trim_right(&line);
         if (line.size == 0) continue;
 
-        String_View tok = sv_split_group(&line, isspace); // Chopping a token.
+        String_View tok = sv_split_group(&line, isspace); sv_trim_left(&line); // Chopping a token.
 
         #ifdef DEBUG
         printf("i %.*s\n", line.size, line.data);
@@ -416,7 +373,7 @@ int assemble(String_View source_code, ByteArray *output, SymbolTable _Nullable *
             }
             else if (sv_cmp_cstr(tok, ".ld") == 0) {
                 u32 i = asm_parse_expr(&line);
-                tok = sv_split_group(&line, isspace);
+                tok = sv_split_group(&line, isspace); sv_trim_left(&line);
                 int a = asm_get_reg(tok);
 
                 // if ((i & 0xFFFF0000) == i) {
@@ -445,10 +402,10 @@ int assemble(String_View source_code, ByteArray *output, SymbolTable _Nullable *
             else if (sv_cmp_cstr(tok, ".if") == 0 ||
                      sv_cmp_cstr(tok, ".ifn") == 0) {
                 int negative = sv_cmp_cstr(tok, ".ifn") == 0;
-                tok = sv_split_group(&line, isspace);
+                tok = sv_split_group(&line, isspace); sv_trim_left(&line);
                 int a = asm_get_reg(tok);
 
-                tok = sv_split_group(&line, isspace);
+                tok = sv_split_group(&line, isspace); sv_trim_left(&line);
                 int op;
                 if (sv_cmp_cstr(tok, "o*") == 0)
                     op = 10;
@@ -473,11 +430,11 @@ int assemble(String_View source_code, ByteArray *output, SymbolTable _Nullable *
                     panic("Unknown condition: %.*s", tok.size, tok.data);
                 }
 
-                tok = sv_split_group(&line, isspace);
+                tok = sv_split_group(&line, isspace); sv_trim_left(&line);
                 int b = asm_get_reg(tok);
-                tok = sv_split_group(&line, isspace);
+                tok = sv_split_group(&line, isspace); sv_trim_left(&line);
                 int x = asm_get_reg(tok);
-                tok = sv_split_group(&line, isspace);
+                tok = sv_split_group(&line, isspace); sv_trim_left(&line);
                 int y = asm_get_reg(tok);
                 // if a OP b y = x;
                 da_append(&instcode, OP_CMP);
@@ -503,6 +460,30 @@ int assemble(String_View source_code, ByteArray *output, SymbolTable _Nullable *
             else if (sv_cmp_cstr(tok, ".org") == 0) {
                 u32 i = asm_parse_expr(&line);
                 onaddress = i;
+            }
+            else if (sv_cmp_cstr(tok, ".str") == 0) {
+                for (size_t i = 0; i < line.size; ++i) {
+                    if (line.data[i] == '\\') {
+                        ++i;
+                        switch (line.data[i]) {
+                        case 'n':
+                            da_append(&instcode, '\n');
+                        break;
+                        case 'r':
+                            da_append(&instcode, '\r');
+                        break;
+                        case 't':
+                            da_append(&instcode, '\t');
+                        break;
+                        case '0':
+                            da_append(&instcode, '\0');
+                        break;
+                        }
+                    }
+                    else {
+                        da_append(&instcode, line.data[i]);
+                    }
+                }
             }
             else {
                 panic("Bad pseudo instruction name: %.*s", tok.size, tok.data);
@@ -541,7 +522,7 @@ int assemble(String_View source_code, ByteArray *output, SymbolTable _Nullable *
                     da_append(&instcode, imm); // We need only lower 8 bits.
                 }
                 else {
-                    tok = sv_split_group(&line, isspace); // 1st argument
+                    tok = sv_split_group(&line, isspace); sv_trim_left(&line); // 1st argument
                     int reg = asm_get_reg(tok);
                     da_append(&instcode, reg);
                 }
@@ -557,7 +538,7 @@ int assemble(String_View source_code, ByteArray *output, SymbolTable _Nullable *
                     da_append(&instcode, 0);
                 }
                 else {
-                    tok = sv_split_group(&line, isspace); // 2st argument
+                    tok = sv_split_group(&line, isspace); sv_trim_left(&line); // 2st argument
                     int reg = asm_get_reg(tok);
                     da_append(&instcode, reg);
                 }
@@ -571,7 +552,7 @@ int assemble(String_View source_code, ByteArray *output, SymbolTable _Nullable *
                 da_append(&instcode, 0);
             }
             else {
-                tok = sv_split_group(&line, isspace); // Output
+                tok = sv_split_group(&line, isspace); sv_trim_left(&line); // Output
                 #ifdef DEBUG
                 printf("1 %.*s\n", line.size, line.data);
                 #endif

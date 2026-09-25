@@ -1,76 +1,78 @@
-loop:
-  push r0
-  mv r0 a0
-  ldlx putd r1
-  call r1
-  pop r0
-  addi r0 1 r0
+.ld hDEADBEEF a0
+.ld putd t0
+call t0
+hlt
 
-  ldhx h7FE0 r1
-  ldlx 10 r2
-  wr8 r1 r2
+puts:
+    push a0
+    push r0
+    mv a0 r0
+puts.loop:
+    rd8 r0 t1
+    .ld puts.end t2
+    mvo t1 t2 pc
+    mv t1 a0
+    .ld putc t2
+    call t2
+    addi r0 1 r0
+    .ld puts.loop t1
+    mv t1 pc
+puts.end:
+    pop r0
+    pop a0
+    ret
 
-  ldlx loop pc
+putd:
+    .ld putd.putzero t0
+    mvo a0 t0 pc
+    push a0
+    push r0
+    push r1
+    mv a0 r0
+    .ld putd.buf+30 r1
+    wr8 r1 zero
+    addi r1 hFF r1
+    ldlx 10 t0
+    wr8 r1 t0
+    addi r1 hFF r1
+putd.loop:
+    .ld putd.end t0
+    mvo r0 t0 pc
+    ldlx 10 t0
+    rem r0 t0 t1
+    addi t1 h30 t1
+    wr8 r1 t1
+    addi r1 hFF r1
+    div r0 t0 r0
+    .ld putd.loop t0
+    mv t0 pc
+putd.end:
+    .ld puts t0
+    addi r1 1 r1
+    mv r1 a0
+    call t0
+    pop r1
+    pop r0
+    pop a0
+    ret
+putd.putzero:
+    push a0
+    .ld putd.zero a0
+    .ld puts t0
+    call t0
+    pop a0
+    ret
+putd.zero:
+    .str 0\n\0
 
-putd::
-  ldl h86A0 r0 ;; 100000
-  ldh h0001 r0
+putc:
+    .ld h7FE00000 t0
+    wr8 t0 a0
+    ret
 
-  rem a0 r0 r0
+text:
+    .str Test1: arithmetics\n\0
 
-  push a0
-
-  push r0 ;; 1st digit (highest)
-  ldlx 10000 r1
-  div r0 r1 a0
-  ldlx putdd1 r0
-  call r0
-  pop r0
-
-  push r0 ;; 2nd digit (highest)
-  ldlx 1000 r1
-  div r0 r1 a0
-  ldlx putdd1 r0
-  call r0
-  pop r0
-
-  push r0 ;; 3rd digit
-  ldlx 100 r1
-  div r0 r1 a0
-  ldlx putdd1 r0
-  call r0
-  pop r0
-
-  push r0 ;; 4th digit
-  ldlx 10 r1
-  div r0 r1 a0
-  ldlx putdd1 r0
-  call r0
-  pop r0
-
-  push r0 ;; 5th digit (lowest)
-  mv r0 a0
-  ldlx putdd r0
-  call r0
-  pop r0
-
-  pop a0
-  ret
-
-putdd1:
-  ldlx putdd r0
-  mve a0 r0 pc
-  ret
-
-putdd:
-  ldlx 10 r0
-  rem a0 r0 r3
-
-  ldhx h7FE0 r0
-
-  ldlx 10 r1
-
-  ;; 0-9
-  addi r3 h30 r1
-  wr8 r0 r1
-  ret
+.org hF000
+putd.buf:
+.org hF020

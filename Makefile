@@ -5,8 +5,8 @@ dependency_files := $(source_files:src/%.c=bin/build/%.d)
 all: bin/build/uces-emu bin/build/uces-asm
 
 test: all
-	./bin/build/uces-asm asm example.ubc bin/prog.bin
-	./bin/build/uces-emu bin/prog.bin
+	./bin/build/uces-asm asm test.ubc bin/test.bin
+	./bin/build/uces-emu bin/test.bin
 
 CC=gcc
 CFLAGS=-ggdb -std=c99 -Wswitch-enum

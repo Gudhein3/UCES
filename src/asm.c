@@ -34,7 +34,7 @@ int main(int argc, char **argv) {
             fprintf(stderr, "Failed to open output file \"%s\" for writing\n", argv[3]);
             return 2;
         }
-
+        // TODO(20260925-122535)
         size_t src_size; // Source code -> String View
         char *src = (char *)read_file(argv[2], &src_size);
         if (src == NULL) {

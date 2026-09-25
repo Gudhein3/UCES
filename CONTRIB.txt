@@ -65,3 +65,6 @@ So, the conventions are following:
     #define _HEADER_INCLUDE
     // Header code
     #endif // _HEADER_INCLUDE
+19. Don't use #if, #elif, #else when you can avoid using them.
+    Most C compilers can easily optimize code like `if (DBG < 3)` if `DBG` is a constant.
+    #if, #elif, #else are also not very nice if you write code for humans, these commands are ugly and as seen above mostly can be avoided, so, replace them if you can.

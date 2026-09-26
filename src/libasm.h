@@ -35,11 +35,12 @@ typedef struct {
 typedef enum {
     ASM_SYMBOL_LOCAL = 0,
     ASM_SYMBOL_GLOBAL = 1,
+    ASM_SYMBOL_IMPORTED = 2,
 } SymbolType;
 
 typedef struct {
     SymbolType type;
-    String_View label; // Just slice it from a source code.
+    String_View label; // Just slice it from the source code.
     u32 address;
 } Symbol;
 

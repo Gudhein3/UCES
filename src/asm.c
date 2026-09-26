@@ -9,6 +9,34 @@ void usage(char *prog) {
                     "\t-l <symbol table>   Import symbols from the table\n", prog);
 }
 
+int read_parse_symbols(SymbolTable *table, const char *fn, u8 *data, size_t size) {
+    if (size < 4 || memcmp(data, "UCST", 4) != 0) {
+        fprintf(stderr, "Bad symbol table: %s\n", fn);
+        return 2;
+    }
+    size -= 4;
+    data += 4;
+    while (size != 0) {
+        Symbol sym;
+        u32 number;
+        memcpy(&number, data, 4);
+        sym.label.size = number;
+        size -= 4;
+        data += 4;
+        sym.label.data = malloc(sym.label.size);
+        memcpy((char *)sym.label.data, data, sym.label.size);
+        size -= sym.label.size;
+        data += sym.label.size;
+        memcpy(&number, data, 4);
+        sym.address = number;
+        size -= 4;
+        data += 4;
+        sym.type = ASM_SYMBOL_IMPORTED;
+        da_append(table, sym);
+    }
+    return 0;
+}
+
 int main(int argc, char **argv) {
     s32 botest;
     memcpy(&botest, "ABCD", 4);
@@ -24,26 +52,47 @@ int main(int argc, char **argv) {
     }
 
     if (strcmp(argv[1], "asm") == 0) {
-        if (argc != 4) {
-            fprintf(stderr, "Expected 3 arguments but got %d\n", argc-1);
-            usage(argv[0]);
+        char *prog = argv[0];
+        argv += 2;
+        argc -= 2;
+        SymbolTable symtable = {0};
+        while (argc != 0 && strcmp(argv[0], "-l") == 0) {
+            size_t size;
+            u8 *data = read_file(argv[1], &size);
+            if (data == NULL) {
+                if (size == 0) { // Command line argument related issue
+                    fprintf(stderr, "Failed to open file: \"%s\"\n", argv[0]);
+                    return 2;
+                }
+                // System related issue
+                fprintf(stderr, "Failed to read file: \"%s\"\n", argv[0]);
+                return 1;
+            }
+            int retcode = read_parse_symbols(&symtable, argv[1], data, size);
+            argv += 2;
+            argc -= 2;
+            if (retcode != 0) return retcode;
+        }
+        if (argc != 2) {
+            fprintf(stderr, "Expected 2 more arguments, got %d\n", argc);
+            usage(prog);
             return 2;
         }
-        FILE *output_file = fopen(argv[3], "wb");
+        FILE *output_file = fopen(argv[1], "wb");
         if (output_file == NULL) {
-            fprintf(stderr, "Failed to open output file \"%s\" for writing\n", argv[3]);
+            fprintf(stderr, "Failed to open output file \"%s\" for writing\n", argv[1]);
             return 2;
         }
         // TODO(20260925-122535)
         size_t src_size; // Source code -> String View
-        char *src = (char *)read_file(argv[2], &src_size);
+        char *src = (char *)read_file(argv[0], &src_size);
         if (src == NULL) {
             if (src_size == 0) { // Command line argument related issue
-                fprintf(stderr, "Failed to open source file: \"%s\"\n", argv[2]);
+                fprintf(stderr, "Failed to open source file: \"%s\"\n", argv[0]);
                 return 2;
             }
             // System related issue
-            fprintf(stderr, "Failed to read source file: \"%s\"\n", argv[2]);
+            fprintf(stderr, "Failed to read source file: \"%s\"\n", argv[0]);
             return 1;
         }
         String_View sv = (String_View) {
@@ -51,7 +100,6 @@ int main(int argc, char **argv) {
             .size = src_size
         };
         ByteArray instcode = {0};
-        SymbolTable symtable = {0};
         int retcode = asm_export_symbols(sv, &symtable);
         if (retcode != 0) return retcode;
         retcode = assemble(sv, &instcode, &symtable);

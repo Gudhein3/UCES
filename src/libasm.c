@@ -288,7 +288,7 @@ int asm_export_symbols(String_View source_code, SymbolTable *table) {
                 for (size_t i = 0; i < line.size; ++i) {
                     if (line.data[i] == '\\') {
                         ++i;
-                        // Assume that after the '\' symbol is followed by only one additional symbol.
+                        // Assume that the '\' symbol is followed by only one additional symbol.
                         instsize += 1;
                     }
                     else {

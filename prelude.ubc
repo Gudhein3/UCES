@@ -1,0 +1,50 @@
+.ld main t0
+call t0
+hlt
+
+
+;; number : u32 -> void
+putd::
+    push r0
+    push a0
+    mv a0 r0
+    .ld @putd.buffer + 18 a0
+@putd.loop:
+    ;; a0 = a0 - 1
+    addi a0 #hFF a0
+    ldlx 10 t0
+    ;; t1 = r0 % t0 + '0'
+    rem r0 t0 t1
+    addi t1 #h30 t1
+    wr8 a0 t1
+    div r0 t0 r0
+    .ld @putd.loop t0
+    mve r0 t0 pc
+    .ld puts t0
+    call t0
+    pop a0
+    pop r0
+    ret
+    ;; 20 symbols output buffer
+@putd.buffer:
+.str \0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\n\0
+
+;; string : u8* -> void
+puts::
+    push r0
+    ldhx #h7FE0 t0
+    mv a0 r0
+@puts.loop:
+    rd8 r0 t1
+    .ld @puts.loop.end t2
+    mvo t1 t2 pc
+    wr8 t0 t1
+    addi r0 1 r0
+    .ld @puts.loop t2
+    mv t2 pc
+@puts.loop.end:
+    pop r0
+    ret
+
+
+main::

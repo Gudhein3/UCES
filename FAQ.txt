@@ -1,8 +1,8 @@
 Assembly syntax
- What do symbols h, b, o before numbers mean?
-  They're marking that the number is either hexadecimal(h), binary(b), octal(o), or decimal(d).
+ What do symbols #h, #b, #o before numbers mean?
+  They're marking that the number is either hexadecimal(#h), binary(#b), octal(#o), or decimal(#d).
   By default all numeric literals are parsed as decimals.
-  But if you want to denote it explicitly, you can place "d" before the numeric literal.
+  But if you want to denote it explicitly, you can place "#d" before the numeric literal.
  How can I find a list of all registers?
   You can read "ABI.txt".
  How can I find a full list of all instructions?
@@ -13,7 +13,7 @@ Assembly syntax
   .dd CONST - put 32 bits
   .org CONST - Change a current address of generating symbols table
   .ld CONST REGISTER - Loads a 32 bit integer into a register(Doesn't work with pc for obvious reasons)
-  .if REGA COND REGB REGX REGY - Iff `REGA COND REGB`, copies data from regx to regy, otherwise does nothing;
+  .if REGA COND REGB REGX REGY - If `REGA COND REGB`, copies data from regx to regy, otherwise does nothing;
                                  Overwrites t0 btw.
                                  Condition may be one of those:
                                    `o*`     - does REGA*REGB cause overflow

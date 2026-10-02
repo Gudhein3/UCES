@@ -18,3 +18,14 @@ u8 *read_file(const char *filename, size_t *_Nullable size) {
     if (size) *size = _size;
     return buf;
 }
+
+// Returns -1 if an error happened.
+size_t get_file_size(const char *filename) {
+    FILE *fptr = fopen(filename, "rb");
+    if (!fptr) return -1;
+    size_t size;
+    fseek(fptr, 0, SEEK_END);
+    size = ftell(fptr);
+    fclose(fptr);
+    return size;
+}

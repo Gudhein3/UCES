@@ -37,3 +37,5 @@ typedef double f64;
 #define CSIZE_FORMAT(c) ((c)/1024/1024/1024), (((c)/1024/1024)%1024), (((c)/1024)%1024), ((c)%1024)
 
 u8 *read_file(const char *filename, size_t *_Nullable size);
+// Returns -1 if an error happened.
+size_t get_file_size(const char *filename);

@@ -49,8 +49,17 @@ typedef struct {
     size_t count, capacity;
 } SymbolTable;
 
+typedef struct {
+    const char *srcfile;
+    u32 lineno;
+    String_View *line;
+    SymbolTable *symbols;
+} AsmProp; // Assembler commonly propagated.
+
+int parse_symbols(SymbolTable *table, const char *fn, u8 *data, size_t size);
+
 extern const char *regnames[];
 extern AsmInst asm_instructions[]; // Terminated with (AsmInst) {0, 0, NULL}
-int asm_export_symbols(String_View source_code, SymbolTable *table);
-int assemble(String_View source_code, ByteArray *output, SymbolTable _Nullable *symbols_table);
+int asm_export_symbols(const char *srcfile, String_View source_code, SymbolTable *table);
+int assemble(const char *srcfile, String_View source_code, ByteArray *output, SymbolTable *symbols_table);
 int unassemble(Byte_View bin, String_Builder *sb);

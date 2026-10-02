@@ -1,5 +1,6 @@
 #include "libasm.h"
 #include <assert.h>
+#include <errno.h>
 
 const char *regnames[] = {
     "zero",
@@ -20,6 +21,8 @@ const char *regnames[] = {
 
 #define INST_1IMM (1<<2)
 #define INST_2IMM (1<<3)
+
+#define DEBUG 0
 
 AsmInst asm_instructions[] = { // Terminated with (AsmInst) {0, 0, NULL}
     (AsmInst) { OP_ADD,   0,          "add"   },
@@ -74,176 +77,382 @@ AsmInst asm_instructions[] = { // Terminated with (AsmInst) {0, 0, NULL}
     (AsmInst) { 0,        0,          NULL    } // Terminator
 };
 
-// TODO: Add support for linking with external symbols
-
-static _Thread_local const char *srcfile;
-static _Thread_local int lineno;
-static _Thread_local ByteArray instcode;
-static _Thread_local SymbolTable *symbols;
-static _Thread_local size_t onaddress; // Address on which pc currently should be if the program is loaded correctly to memory.
-
 #undef panic
+#define panic(fmt, ...) do {fprintf(stderr, "%s:%d:\x1b[31mPanic at \""__FILE__":"__STR(__LINE__)"\" \x1b[0m: "fmt"\n", prop.srcfile, prop.lineno, __VA_ARGS__); abort();} while(0)
 
-#define panic(fmt, ...) do {fprintf(stderr, "\x1b[31mPanic at \""__FILE__":"__STR(__LINE__)"\" for \"%s:%d\"\x1b[0m: "fmt"\n", srcfile, lineno+1, __VA_ARGS__); abort();} while(0)
+#define warning(fmt, ...) do {fprintf(stderr, "%s:%d:\x1b[33mWarning at \""__FILE__":"__STR(__LINE__)"\" \x1b[0m: "fmt"\n", prop.srcfile, prop.lineno, __VA_ARGS__); } while(0)
 
-#define warning(fmt, ...) do {fprintf(stderr, "\x1b[33mWarning at \""__FILE__":"__STR(__LINE__)"\" for \"%s:%d\"\x1b[0m: "fmt"\n", srcfile, lineno+1, __VA_ARGS__); } while(0)
-
-// Dirty
-u32 asm_parse_expr(String_View *line);
-
-u32 asm_parse_numeric(String_View token) {
-    return asm_parse_expr(&token);
+int parse_symbols(SymbolTable *table, const char *fn, u8 *data, size_t size) {
+    if (size < 4 || memcmp(data, "UCST", 4) != 0) {
+        fprintf(stderr, "Bad symbol table: %s\n", fn);
+        return 2;
+    }
+    size -= 4;
+    data += 4;
+    while (size != 0) {
+        Symbol sym;
+        u32 number;
+        memcpy(&number, data, 4);
+        sym.label.size = number;
+        size -= 4;
+        data += 4;
+        sym.label.data = malloc(sym.label.size);
+        memcpy((char *)sym.label.data, data, sym.label.size);
+        size -= sym.label.size;
+        data += sym.label.size;
+        memcpy(&number, data, 4);
+        sym.address = number;
+        size -= 4;
+        data += 4;
+        sym.type = ASM_SYMBOL_IMPORTED;
+        da_append(table, sym);
+    }
+    return 0;
 }
 
-static int asm_parse_primary_terminator(int x) {
-    return isspace(x) || x == '+' || x == '-' || x == '*' || x == '/' || x == '|' || x == '&' || x == '^';
+static int is_token_terminator(int ch) {
+    char table[128] = {
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        1, 0, 0, 0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 0, 1,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0,
+    };
+    return ch < 128 && table[ch];
 }
 
-u32 asm_parse_primary(String_View *line) {
-    String_View token = sv_split_group(line, asm_parse_primary_terminator);
-    // Dirty hack to prevent chopping operator
+static String_View asm_chop_token(String_View *line) {
+    sv_trim_left(line);
+    if (line->size > 0) {
+        if (!isspace(line->data[0]) && is_token_terminator(line->data[0])) {
+            line->data++;
+            line->size--;
+            return (String_View) {
+                .size = 1,
+                .data = line->data - 1,
+            };
+        }
+    }
+    String_View token = sv_split_group(line, is_token_terminator);
+    // Unchop the terminator.
     line->size++;
     line->data--;
-    if (token.size == 0) {
-        panic("Expected numeric or symbol name but got empty token\n", NULL);
-    }
-    if (symbols) {
-        for (size_t i = 0; i < symbols->count; ++i) {
-            if (sv_cmp_sv(token, symbols->items[i].label) == 0) {
-                return symbols->items[i].address;
-            }
-        }
-    }
-    u32 i = 0;
-    size_t idx = 0;
-    int neg = 0;
-    if (token.data[0] == '-') {
-        idx += 1;
-        neg = 1;
-    }
-    int system = 0;
-    switch (tolower(token.data[0])) {
-    case 'h':
-        system = 1;
-        idx += 1;
-        break;
-    case 'b':
-        system = 2;
-        idx += 1;
-        break;
-    case 'o':
-        system = 3;
-        idx += 1;
-        break;
-    case 'd': // Explicitly use decimal system
-    default: // Implicitly use decimal system
-    }
-    while (idx < token.size) {
-        if (system == 0) {
-            if (isdigit(token.data[idx])) {
-                i = i*10+token.data[idx]-'0';
-            }
-        }
-        else if (system == 1) {
-            if ('0' <= token.data[idx] && token.data[idx] <= '9') {
-                i = i*16+token.data[idx]-'0';
-            }
-            else if ('a' <= token.data[idx] && token.data[idx] <= 'f') {
-                i = i*16+token.data[idx]-'a'+10;
-            }
-            else if ('A' <= token.data[idx] && token.data[idx] <= 'F') {
-                i = i*16+token.data[idx]-'A'+10;
-            }
-        }
-        else if (system == 2) {
-            if ('0' <= token.data[idx] && token.data[idx] <= '1') {
-                i = i*2+token.data[idx]-'0';
-            }
-        }
-        else if (system == 3) {
-            if ('0' <= token.data[idx] && token.data[idx] <= '7') {
-                i = i*8+token.data[idx]-'0';
-            }
-        }
-        idx += 1;
-    }
-    return neg ? -i : i;
+    // TODO: Why do we have to do so?
+    // Because I was lazy.
+    return token;
 }
 
-u32 asm_parse_expr(String_View *line) {
-    u32 value = asm_parse_primary(line);
-    sv_trim_left(line);
-    while (line->size != 0) {
-        if (line->data[0] == '+') {
-            line->size--;
-            line->data++;
-            value += asm_parse_primary(line);
-        }
-        else {
-            break;
-        }
-        sv_trim_left(line);
-    }
-    return value;
-}
-
-u32 asm_get_imm(String_View *line) {
-    u32 i = asm_parse_expr(line);
-    if (i >= (1<<16)) {
-        warning("Too big numeric literal", NULL);
-    }
-    return i;
-}
-
-int asm_get_reg(String_View token) {
-    if (token.size > 1 && token.data[0] == 'x') {
-        token.size--;
-        token.data++;
-        int i = asm_get_imm(&token);
-        if (i > 0 && i < 32) return i;
-        panic("Bad register name: \"%.*s\"", token.size, token.data);
-    }
-    for (size_t i = 0; i < sizeof(regnames)/sizeof(*regnames); ++i) {
-        if (sv_cmp_cstr(token, regnames[i]) == 0) {
-            return i;
-        }
-    }
-    panic("Bad register name: \"%.*s\"", token.size, token.data);
-}
-
-AsmInst *_Nullable asm_get_inst(String_View token) {
+static AsmInst *_Nullable asm_get_inst(String_View token) {
     for (size_t i = 0; i < sizeof(asm_instructions)/sizeof(*asm_instructions)-1; ++i) {
         if (sv_cmp_cstr(token, asm_instructions[i].name) == 0) return &asm_instructions[i];
     }
     return NULL;
 }
 
-AsmInst *_Nullable asm_get_inst_by_op(OpCode op) {
+static Symbol *_Nullable asm_get_symbol(SymbolTable table, String_View token) {
+    for (size_t i = 0; i < table.count; ++i) {
+        if (sv_cmp_sv(token, table.items[i].label) == 0) return &table.items[i];
+    }
+    return NULL;
+}
+
+static AsmInst *_Nullable asm_get_inst_by_op(OpCode op) {
     for (size_t i = 0; i < sizeof(asm_instructions)/sizeof(*asm_instructions)-1; ++i) {
         if (asm_instructions[i].op == op) return &asm_instructions[i];
     }
     return NULL;
 }
 
-// #define DEBUG
+static void asm_expect_token(AsmProp prop, const char *value) {
+    String_View token = asm_chop_token(prop.line);
+    if (sv_cmp_cstr(token, value))
+        panic("Expected token \"%s\", but got \"%.*s\"", value, token.size, token.data);
+}
 
-int asm_export_symbols(String_View source_code, SymbolTable *table) {
-    lineno = 0;
-    onaddress = 0;
+typedef enum {
+    BINARY=2,
+    OCTAL=8,
+    DECIMAL=10,
+    HEXADECIMAL=16,
+} Base;
 
+static u32 asm_parse_numeric(AsmProp prop, String_View token, Base base) {
+    if (token.size < 1) {
+        panic("Expected at least one digit in a number", 0);
+    }
+    u32 num = 0; // TODO: I am pretty sure there is a better solution that doesn't involve copy&pasting the same code 4 times. Unfortunately, I still haven't found it yet.
+    switch (base) {
+    case BINARY:
+        for (size_t i = 0; i < token.size; ++i) {
+            char c = token.data[i];
+            if ('0' <= c && c <= '1')
+                num = num * 2 + c - '0';
+            else
+                panic("Unexpected digit in a binary literal: '%c'(%02X)\n", c, c);
+        }
+        break;
+    case OCTAL:
+        for (size_t i = 0; i < token.size; ++i) {
+            char c = token.data[i];
+            if ('0' <= c && c <= '7')
+                num = num * 8 + c - '0';
+            else
+                panic("Unexpected digit in an octal literal: '%c'(%02X)\n", c, c);
+        }
+        break;
+    case DECIMAL:
+        for (size_t i = 0; i < token.size; ++i) {
+            char c = token.data[i];
+            if (isdigit(c))
+                num = num * 10 + c - '0';
+            else
+                panic("Unexpected digit in a decimal literal: '%c'(%02X)\n", c, c);
+        }
+        break;
+    case HEXADECIMAL:
+        for (size_t i = 0; i < token.size; ++i) {
+            char c = token.data[i];
+            if (isdigit(c))
+                num = num * 16 + c - '0';
+            else if (isxdigit(c))
+                num = num * 16 + c - 'A' + 10;
+            else
+                panic("Unexpected digit in a hexadecimal literal: '%c'(%02X)\n", c, c);
+        }
+        break;
+    default:
+        assert(0 && "Unreachable: Base");
+    }
+    return num;
+}
+
+static u32 asm_parse_expr(AsmProp prop);
+
+static u32 asm_parse_primary(AsmProp prop) {
+    if (prop.line->size < 1)
+        panic("Expected at least one symbol in an expression", 0);
+    { // Try unary ops first.
+        String_View modified_line = *prop.line;
+        // Maybe this shouldn't be a case and there should be a peekableish interface.
+        // Although, I think the current approach is more flexible in terms of text manipulations.
+        String_View token = asm_chop_token(&modified_line);
+        if (token.size == 1) {
+            switch (token.data[0]) {
+            case '+':
+                *prop.line = modified_line;
+                return asm_parse_primary(prop);
+            case '-':
+                *prop.line = modified_line;
+                return -asm_parse_primary(prop);
+            case '!':
+                *prop.line = modified_line;
+                return !asm_parse_primary(prop);
+            case '~':
+                *prop.line = modified_line;
+                return 0xFFFFFFFF ^ asm_parse_primary(prop);
+            }
+        }
+    }
+    String_View token = asm_chop_token(prop.line);
+    if (token.size == 0)
+        panic("Empty token", 0);
+    if (!sv_cmp_cstr(token, "(")) {
+        u32 r = asm_parse_expr(prop);
+        asm_expect_token(prop, ")");
+        return r;
+    }
+    Symbol *symbol = asm_get_symbol(*prop.symbols, token);
+    if (symbol) // Oh heck, it's a symbol
+        return symbol->address;
+
+    Base base = DECIMAL;
+    if (token.data[0] == '#') { // Oh heck, it's a number with a predefined base.
+        token.data++; token.size--;
+        if (token.size == 0)
+            panic("Empty token", 0);
+        switch (token.data[0]) {
+        case 'b':
+            base = BINARY;
+            token.data++; token.size--;
+            break;
+        case 'o':
+            base = OCTAL;
+            token.data++; token.size--;
+            break;
+        case 'd':
+            token.data++; token.size--;
+            break;
+        case 'h':
+            base = HEXADECIMAL;
+            token.data++; token.size--;
+            break;
+        default:
+            panic("Unknown number prefix: '%c'\n", token.data[0]);
+        }
+    }
+    return asm_parse_numeric(prop, token, base);
+}
+
+static u32 asm_parse_e4(AsmProp prop) {
+    u32 value = asm_parse_primary(prop);
+    for (;;) {
+        String_View modified_line = *prop.line;
+        String_View token = asm_chop_token(&modified_line);
+        if (token.size == 1) {
+            switch (token.data[0]) {
+            case '*':
+                *prop.line = modified_line;
+                value *= asm_parse_primary(prop);
+                break;
+            case '/':
+                *prop.line = modified_line;
+                value /= asm_parse_primary(prop);
+                break;
+            case '%':
+                *prop.line = modified_line;
+                value %= asm_parse_primary(prop);
+                break;
+            case '&':
+                *prop.line = modified_line;
+                value &= asm_parse_primary(prop);
+                break;
+            case '^':
+                *prop.line = modified_line;
+                value ^= asm_parse_primary(prop);
+                break;
+            default:
+                goto end;
+            }
+        }
+        else {
+            break;
+        }
+    }
+    end:
+    return value;
+}
+
+static u32 asm_parse_e3(AsmProp prop) {
+    u32 value = asm_parse_e4(prop);
+    for (;;) {
+        String_View modified_line = *prop.line;
+        String_View token = asm_chop_token(&modified_line);
+        if (token.size == 1) {
+            switch (token.data[0]) {
+            case '|':
+                *prop.line = modified_line;
+                value |= asm_parse_e4(prop);
+                break;
+            default:
+                goto end;
+            }
+        }
+        else {
+            break;
+        }
+    }
+    end:
+    return value;
+}
+
+static u32 asm_parse_e2(AsmProp prop) {
+    u32 value = asm_parse_e3(prop);
+    for (;;) {
+        String_View modified_line = *prop.line;
+        String_View token = asm_chop_token(&modified_line);
+        if (token.size == 1) {
+            switch (token.data[0]) {
+            case '+':
+                *prop.line = modified_line;
+                value += asm_parse_e3(prop);
+                break;
+            case '-':
+                *prop.line = modified_line;
+                value -= asm_parse_e3(prop);
+                break;
+            default:
+                goto end;
+            }
+        }
+        else {
+            break;
+        }
+    }
+    end:
+    return value;
+}
+
+static u32 asm_parse_expr(AsmProp prop) {
+    u32 value = asm_parse_e2(prop);
+    for (;;) {
+        String_View modified_line = *prop.line;
+        String_View token = asm_chop_token(&modified_line);
+        if (token.size == 1) {
+            switch (token.data[0]) {
+            case '<':
+                *prop.line = modified_line;
+                value <<= asm_parse_e2(prop);
+                break;
+            case '>':
+                *prop.line = modified_line;
+                value >>= asm_parse_e2(prop);
+                break;
+            default:
+                goto end;
+            }
+        }
+        else {
+            break;
+        }
+    }
+    end:
+    return value;
+}
+
+static int asm_parse_reg(AsmProp prop) {
+    String_View tok = asm_chop_token(prop.line);
+    if (tok.size > 1 && tok.data[0] == 'x') {
+        tok.size--;
+        tok.data++;
+        int i = asm_parse_numeric(prop, tok, DECIMAL);
+        if (i > 0 && i < 32) return i;
+        panic("Bad register name: \"%.*s\"", tok.size, tok.data);
+    }
+    for (size_t i = 0; i < sizeof(regnames)/sizeof(*regnames); ++i) {
+        if (sv_cmp_cstr(tok, regnames[i]) == 0) {
+            return i;
+        }
+    }
+    panic("Bad register name: \"%.*s\"", tok.size, tok.data);
+}
+
+int asm_export_symbols(const char *srcfile, String_View source_code, SymbolTable *table) {
+    u32 address = 0;
+    int lineno = 0;
     while (source_code.size > 0) {
+        lineno++;
+
         String_View line = sv_split_char(&source_code, '\n');
-        line = sv_split_char(&line, ';');
+        line = sv_split_char(&line, ';'); // Remove comments.
         sv_trim_left(&line);
         sv_trim_right(&line);
-        if (line.size == 0) continue;
+        if (line.size == 0) continue; // If the first non-space character is ';', the line is one big comment we shall ignore.
 
-        String_View tok = sv_split_group(&line, isspace); sv_trim_left(&line); // Chopping a token.
-
-        if (tok.size && tok.data[tok.size-1] == ':') {
+        String_View tok = asm_chop_token(&line);
+        if (!tok.size) continue;
+        AsmProp prop = (AsmProp) {
+            .srcfile=srcfile,
+            .lineno=lineno,
+            .line=&line,
+            .symbols=table
+        };
+        if (tok.data[tok.size-1] == ':') {
             tok.size -= 1;
             SymbolType type = ASM_SYMBOL_LOCAL;
-            if (tok.size && tok.data[tok.size-1] == ':') { // "::" at end mean the symbol is global.
+            if (tok.size && tok.data[tok.size-1] == ':') { // "::" at the end of a line means that the symbol is global.
                 type = ASM_SYMBOL_GLOBAL;
                 tok.size -= 1;
             }
@@ -253,213 +462,212 @@ int asm_export_symbols(String_View source_code, SymbolTable *table) {
             Symbol sym = (Symbol) {
                 .type = type,
                 .label = tok,
-                .address = onaddress
+                .address = address
             };
             da_append(table, sym);
             continue;
         }
-
-        sv_trim_left(&line);
-        size_t instsize = 0;
-        if (tok.size && tok.data[0] == '.') { // Pseudo instructions
+        if (tok.data[0] == '.') {
             if (sv_cmp_cstr(tok, ".db") == 0) {
-                instsize += 1;
+                address += 1;
             }
             else if (sv_cmp_cstr(tok, ".dp") == 0) {
             }
             else if (sv_cmp_cstr(tok, ".dw") == 0) {
-                instsize += 2;
+                address += 2;
             }
             else if (sv_cmp_cstr(tok, ".dd") == 0) {
-                instsize += 4;
+                address += 4;
             }
             else if (sv_cmp_cstr(tok, ".org") == 0) {
-                tok = sv_split_group(&line, isspace); sv_trim_left(&line);
-                u32 i = asm_parse_numeric(tok);
-                onaddress = i;
+                u32 i = asm_parse_expr(prop);
+                address = i;
             }
             else if (sv_cmp_cstr(tok, ".ld") == 0) {
-                instsize += 8;
+                address += 8;
             }
-            else if (sv_cmp_cstr(tok, ".if") == 0) {
-                instsize += 12;
+            else if (sv_cmp_cstr(tok, ".if") == 0 ||
+                     sv_cmp_cstr(tok, ".ifn") == 0) {
+                address += 12;
             }
             else if (sv_cmp_cstr(tok, ".str") == 0) {
                 for (size_t i = 0; i < line.size; ++i) {
                     if (line.data[i] == '\\') {
                         ++i;
                         // Assume that the '\' symbol is followed by only one additional symbol.
-                        instsize += 1;
+                        address += 1;
                     }
                     else {
-                        instsize += 1;
+                        address += 1;
                     }
                 }
+            }
+            else if (sv_cmp_cstr(tok, ".incbin") == 0) {
+                sv_trim_left(&line);
+                char *filename = malloc(line.size + 1);
+                if (!filename) {
+                    fprintf(stderr, "\x1b[31mFailed to allocate a string: %s\x1b[0m\n", strerror(errno));
+                    exit(1);
+                }
+                memcpy(filename, line.data, line.size);
+                filename[line.size] = 0;
+                size_t size = get_file_size(filename); // Hopefully nobody will modify the file before the assemble step.
+                if (size == -1) {
+                    panic("Failed to open the file: %s", strerror(errno));
+                }
+                free(filename);
+                address += size;
+            }
+            else if (sv_cmp_cstr(tok, ".incsym") == 0) {
+                sv_trim_left(&line);
+                char *filename = malloc(line.size + 1);
+                if (!filename) {
+                    fprintf(stderr, "\x1b[31mFailed to allocate a string: %s\x1b[0m\n", strerror(errno));
+                    exit(1);
+                }
+                memcpy(filename, line.data, line.size);
+                filename[line.size] = 0;
+                size_t size;
+                u8 *data = read_file(filename, &size);
+                if (!data) {
+                    panic("Failed to open file: %s", strerror(errno));
+                }
+                int status = parse_symbols(table, filename, data, size);
+                if (status != 0) {
+                    panic("Failed to parse symbol table", 0);
+                    exit(status);
+                }
+                if (size == -1) {
+                    panic("Failed to open the file: %s", strerror(errno));
+                }
+                free(filename);
             }
             else {
                 panic("Bad pseudo instruction name: %.*s", tok.size, tok.data);
             }
         }
-        else { // Normal instructions
-            AsmInst *inst = asm_get_inst(tok); // Just checking the code is valid.
-            if (inst == NULL) {
-                panic("Bad instruction name: %.*s", tok.size, tok.data);
-            }
-
-            instsize += 4;
+        else {
+            address += 4;
         }
-
-        onaddress += instsize;
-        lineno += 1;
     }
-
     return 0;
 }
 
-int assemble(String_View source_code, ByteArray *output, SymbolTable _Nullable *symbols_table) {
-    lineno = 0;
-    onaddress = 0;
-    memset(&instcode, 0, sizeof(instcode));
-    symbols = symbols_table;
+int assemble(const char *srcfile, String_View source_code, ByteArray *output, SymbolTable *table) {
 
+    u32 address = 0;
+    int lineno = 0;
     while (source_code.size > 0) {
+        lineno++;
+
         String_View line = sv_split_char(&source_code, '\n');
-        #ifdef DEBUG
-        printf("f %.*s\n", line.size, line.data);
-        #endif
-        line = sv_split_char(&line, ';');
+        line = sv_split_char(&line, ';'); // Remove comments.
         sv_trim_left(&line);
         sv_trim_right(&line);
-        if (line.size == 0) continue;
-
-        String_View tok = sv_split_group(&line, isspace); sv_trim_left(&line); // Chopping a token.
-
-        #ifdef DEBUG
-        printf("i %.*s\n", line.size, line.data);
-        #endif
-
-        if (tok.size && tok.data[tok.size-1] == ':') {
+        if (line.size == 0) continue; // If the first non-space character is ';', the line is one big comment we shall ignore.
+        if (DEBUG)
+            printf("Encountered line: \"%.*s\"\n", line.size, line.data);
+        String_View tok = asm_chop_token(&line);
+        if (!tok.size) continue;
+        if (tok.data[tok.size-1] == ':') {
             continue;
         }
-
-        sv_trim_left(&line);
-        instcode.count = 0;
-        if (tok.size && tok.data[0] == '.') { // Pseudo instructions
+        AsmProp prop = (AsmProp) {
+            .srcfile=srcfile,
+            .lineno=lineno,
+            .line=&line,
+            .symbols=table
+        };
+        if (tok.data[0] == '.') {
             if (sv_cmp_cstr(tok, ".db") == 0) {
-                u32 i = asm_parse_expr(&line);
-                if (i >= (1<<8)) {
-                    warning("Too big 8bit numeric literal", NULL);
+                u32 imm = asm_parse_expr(prop);
+                if (imm >= 1<<8) {
+                    warning("Too large 8 bit constant: h%08X\n", imm);
                 }
-                da_append(&instcode, i);
+                da_append(output, imm&0xFF);
             }
-            else if  (sv_cmp_cstr(tok, ".dp") == 0) {
-                u32 i = asm_parse_expr(&line);
-                printf(".dp: %zu\n", i);
+            else if (sv_cmp_cstr(tok, ".dp") == 0) {
+                assert(0 && "TODO");
             }
             else if (sv_cmp_cstr(tok, ".dw") == 0) {
-                u32 i = asm_parse_expr(&line);
-                if (i >= (1<<16)) {
-                    warning("Too big 16bit numeric literal", NULL);
+                u32 imm = asm_parse_expr(prop);
+                if (imm >= 1<<16) {
+                    warning("Too large 16 bit constant: h%08X\n", imm);
                 }
-                da_append(&instcode, i&0xFF);
-                da_append(&instcode, (i>>8));
+                da_append(output, imm&0xFF);
+                da_append(output, (imm>>8)&0xFF);
             }
             else if (sv_cmp_cstr(tok, ".dd") == 0) {
-                u32 i = asm_parse_expr(&line);
-                da_append(&instcode, i&0xFF);
-                da_append(&instcode, (i>>8)&0xFF);
-                da_append(&instcode, (i>>16)&0xFF);
-                da_append(&instcode, (i>>24));
+                u32 imm = asm_parse_expr(prop);
+                da_append(output, imm&0xFF);
+                da_append(output, (imm>>8)&0xFF);
+                da_append(output, (imm>>16)&0xFF);
+                da_append(output, (imm>>24)&0xFF);
+            }
+            else if (sv_cmp_cstr(tok, ".org") == 0) {
+                u32 i = asm_parse_expr(prop);
+                address = i;
             }
             else if (sv_cmp_cstr(tok, ".ld") == 0) {
-                u32 i = asm_parse_expr(&line);
-                tok = sv_split_group(&line, isspace); sv_trim_left(&line);
-                int a = asm_get_reg(tok);
-
-                // if ((i & 0xFFFF0000) == i) {
-                //     da_append(&instcode, OP_LDHX);
-                //     da_append(&instcode, (i>>16)&0xFF);
-                //     da_append(&instcode, (i>>24)&0xFF);
-                //     da_append(&instcode, a);
-                // }
-                // else if ((i & 0x0000FFFF) == i) {
-                //     da_append(&instcode, OP_LDLX);
-                //     da_append(&instcode, i&0xFF);
-                //     da_append(&instcode, (i>>8)&0xFF);
-                //     da_append(&instcode, a);
-                // }
-                // else {
-                    da_append(&instcode, OP_LDH);
-                    da_append(&instcode, (i>>16)&0xFF);
-                    da_append(&instcode, (i>>24)&0xFF);
-                    da_append(&instcode, a);
-                    da_append(&instcode, OP_LDL);
-                    da_append(&instcode, i&0xFF);
-                    da_append(&instcode, (i>>8)&0xFF);
-                    da_append(&instcode, a);
-                // }
+                u32 imm = asm_parse_expr(prop);
+                int a = asm_parse_reg(prop);
+                if (a == 001) { // PC
+                    warning("Writing to the PC register may lead to PC corruption, due to nature of the '.ld' pseudo instruction. It generates two separated instructions, ldh (i>>16)&0xFFFF reg and ldl i&0xFFFF reg, hopefully, you see why this may cause the corruption", 0);
+                }
+                // Already 32bit :-)
+                da_append(output, OP_LDH);
+                da_append(output, (imm>>16)&0xFF);
+                da_append(output, (imm>>24)&0xFF);
+                da_append(output, a);
+                da_append(output, OP_LDL);
+                da_append(output, imm&0xFF);
+                da_append(output, (imm>>8)&0xFF);
+                da_append(output, a);
             }
             else if (sv_cmp_cstr(tok, ".if") == 0 ||
                      sv_cmp_cstr(tok, ".ifn") == 0) {
                 int negative = sv_cmp_cstr(tok, ".ifn") == 0;
-                tok = sv_split_group(&line, isspace); sv_trim_left(&line);
-                int a = asm_get_reg(tok);
-
-                tok = sv_split_group(&line, isspace); sv_trim_left(&line);
-                int op;
-                if (sv_cmp_cstr(tok, "o*") == 0)
-                    op = 10;
-                else if (sv_cmp_cstr(tok, "c+") == 0)
-                    op = 9;
-                else if (sv_cmp_cstr(tok, "c-") == 0)
-                    op = 8;
-                else if (sv_cmp_cstr(tok, ">u") == 0)
-                    op = 7;
-                else if (sv_cmp_cstr(tok, "<u") == 0)
-                    op = 6;
-                else if (sv_cmp_cstr(tok, ">s") == 0)
-                    op = 5;
-                else if (sv_cmp_cstr(tok, "<s") == 0)
-                    op = 4;
-                else if (sv_cmp_cstr(tok, "!=") == 0)
-                    op = 3;
-                else if (sv_cmp_cstr(tok, "==") == 0 ||
-                         sv_cmp_cstr(tok, "=") == 0)
-                    op = 2;
-                else {
-                    panic("Unknown condition: %.*s", tok.size, tok.data);
-                }
-
-                tok = sv_split_group(&line, isspace); sv_trim_left(&line);
-                int b = asm_get_reg(tok);
-                tok = sv_split_group(&line, isspace); sv_trim_left(&line);
-                int x = asm_get_reg(tok);
-                tok = sv_split_group(&line, isspace); sv_trim_left(&line);
-                int y = asm_get_reg(tok);
-                // if a OP b y = x;
-                da_append(&instcode, OP_CMP);
-                da_append(&instcode, a);
-                da_append(&instcode, b);
-                da_append(&instcode, 27);
-
-                da_append(&instcode, OP_TSBI);
-                da_append(&instcode, 27);
-                da_append(&instcode, op);
-                da_append(&instcode, 27);
-
-                if (!negative) {
-                    da_append(&instcode, OP_MVE);
-                }
-                else { // .ifn
-                    da_append(&instcode, OP_MVO);
-                }
-                da_append(&instcode, 27);
-                da_append(&instcode, x);
-                da_append(&instcode, y);
-            }
-            else if (sv_cmp_cstr(tok, ".org") == 0) {
-                u32 i = asm_parse_expr(&line);
-                onaddress = i;
+                int rega = asm_parse_reg(prop);
+                String_View cond = asm_chop_token(&line);
+                int regb = asm_parse_reg(prop);
+                int regx = asm_parse_reg(prop);
+                int regy = asm_parse_reg(prop);
+                da_append(output, OP_CMP);
+                da_append(output, rega);
+                da_append(output, regb);
+                da_append(output, 27); // t0
+                da_append(output, OP_TSBI);
+                da_append(output, 27);
+                if (sv_cmp_cstr(cond, "o*"))
+                    da_append(output, 10);
+                else if (sv_cmp_cstr(cond, "c+"))
+                    da_append(output, 9);
+                else if (sv_cmp_cstr(cond, "c-"))
+                    da_append(output, 8);
+                else if (sv_cmp_cstr(cond, ">u"))
+                    da_append(output, 7);
+                else if (sv_cmp_cstr(cond, "<u"))
+                    da_append(output, 6);
+                else if (sv_cmp_cstr(cond, ">s"))
+                    da_append(output, 5);
+                else if (sv_cmp_cstr(cond, "<s"))
+                    da_append(output, 4);
+                else if (sv_cmp_cstr(cond, "!="))
+                    da_append(output, 3);
+                else if (sv_cmp_cstr(cond, "=="))
+                    da_append(output, 2);
+                else if (sv_cmp_cstr(cond, "="))
+                    da_append(output, 2);
+                else
+                    panic("Invalid condition: \"%.*s\"", cond.size, cond.data);
+                da_append(output, 27); // t0
+                if (negative)
+                    da_append(output, OP_MVO);
+                else
+                    da_append(output, OP_MVE);
+                da_append(output, 27); // t0
+                da_append(output, regx);
+                da_append(output, regy); // t0
             }
             else if (sv_cmp_cstr(tok, ".str") == 0) {
                 for (size_t i = 0; i < line.size; ++i) {
@@ -467,119 +675,120 @@ int assemble(String_View source_code, ByteArray *output, SymbolTable _Nullable *
                         ++i;
                         switch (line.data[i]) {
                         case 'n':
-                            da_append(&instcode, '\n');
+                            da_append(output, '\n');
                         break;
                         case 'r':
-                            da_append(&instcode, '\r');
+                            da_append(output, '\r');
                         break;
                         case 't':
-                            da_append(&instcode, '\t');
+                            da_append(output, '\t');
                         break;
                         case '0':
-                            da_append(&instcode, '\0');
+                            da_append(output, '\0');
                         break;
                         }
                     }
                     else {
-                        da_append(&instcode, line.data[i]);
+                        da_append(output, line.data[i]);
                     }
                 }
+            }
+            else if (sv_cmp_cstr(tok, ".incbin") == 0) {
+                sv_trim_left(&line);
+                char *filename = malloc(line.size + 1);
+                if (!filename) {
+                    fprintf(stderr, "\x1b[31mFailed to allocate %zu bytes: %s\x1b[0m\n", line.size + 1, strerror(errno));
+                    exit(1);
+                }
+                memcpy(filename, line.data, line.size);
+                filename[line.size] = 0;
+                size_t size;
+                u8 *data = read_file(filename, &size);
+                if (!data) {
+                    panic("Failed to open file: %s", strerror(errno));
+                }
+                free(filename);
+                da_extend(output, size, data);
+                free(data);
+            }
+            else if (sv_cmp_cstr(tok, ".incsym") == 0) {
             }
             else {
                 panic("Bad pseudo instruction name: %.*s", tok.size, tok.data);
             }
         }
-        else { // Normal instructions
+        else {
             AsmInst *inst = asm_get_inst(tok);
-            if (inst == NULL) {
+            if (!inst) {
                 panic("Bad instruction name: %.*s", tok.size, tok.data);
             }
 
-            OpCode op = inst->op; // First byte is an opcode.
-            da_append(&instcode, op);
+            // [Opcode:8] [R1:8] [R2:8] [R3:8]
+            // [Opcode:8] [IMM:16]      [R3:8]
+            OpCode op = inst->op;
+            da_append(output, op);
 
-            #ifdef DEBUG
-            printf("0 %.*s\n", line.size, line.data);
-            #endif
+            if (DEBUG)
+                printf("Produced opcode %02X\n", op);
+
             if ((op & 0xF0) == 0xF0) {
-                u16 imm = (u16)(u64)asm_get_imm(&line);
-                #ifdef DEBUG
-                printf("a %.*s\n", line.size, line.data);
-                #endif
-                da_append(&instcode, (imm>> 0)&0xFF);
-                da_append(&instcode, (imm>> 8)&0xFF);
+                u32 imm = asm_parse_expr(prop);
+                if (imm >= 1<<16) {
+                    warning("Too large 16 bit constant: h%08X\n", imm);
+                }
+                da_append(output, imm&0xFF);
+                da_append(output, (imm >> 8)&0xFF);
             }
-            else if (inst->flags & INST_NOARG) {
-                // No args so nothing interesting here.
-                da_append(&instcode, 0);
-                da_append(&instcode, 0);
+            else if (inst->flags & INST_NOARG) { // Indeed no arguments.
+                da_append(output, 0);
+                da_append(output, 0);
             }
             else {
-                // TODO: Make it cleaner.
-
                 if (inst->flags & INST_1IMM) {
-                    u16 imm = (u16)(u64)asm_get_imm(&line);
-                    da_append(&instcode, imm); // We need only lower 8 bits.
+                    u32 imm = asm_parse_expr(prop);
+                    if (imm >= 1<<8) {
+                        warning("Too large 8 bit constant: h%08X\n", imm);
+                    }
+                    da_append(output, imm&0xFF);
                 }
                 else {
-                    tok = sv_split_group(&line, isspace); sv_trim_left(&line); // 1st argument
-                    int reg = asm_get_reg(tok);
-                    da_append(&instcode, reg);
+                    int reg = asm_parse_reg(prop);
+                    da_append(output, reg);
+                    if (DEBUG)
+                        printf("Produced REG1 %02X\n", reg);
                 }
-                #ifdef DEBUG
-                printf("a %.*s\n", line.size, line.data);
-                #endif
 
                 if (inst->flags & INST_2IMM) {
-                    u16 imm = (u16)(u64)asm_get_imm(&line);
-                    da_append(&instcode, imm); // We need only lower 8 bits.
+                    u32 imm = asm_parse_expr(prop);
+                    if (imm >= 1<<8) {
+                        warning("Too large 8 bit constant: h%08X\n", imm);
+                    }
+                    da_append(output, imm&0xFF);
                 }
                 else if (inst->flags & INST_NO2A) {
-                    da_append(&instcode, 0);
+                    da_append(output, 0);
                 }
                 else {
-                    tok = sv_split_group(&line, isspace); sv_trim_left(&line); // 2st argument
-                    int reg = asm_get_reg(tok);
-                    da_append(&instcode, reg);
+                    int reg = asm_parse_reg(prop);
+                    da_append(output, reg);
+                    if (DEBUG)
+                        printf("Produced REG2 %02X\n", reg);
                 }
-                #ifdef DEBUG
-                printf("b %.*s\n", line.size, line.data);
-                #endif
             }
-
             if (inst->flags & INST_NOOUT) {
-                // No output so nothing interesting here.
-                da_append(&instcode, 0);
+                // No output indeed.
+                da_append(output, 0);
             }
             else {
-                tok = sv_split_group(&line, isspace); sv_trim_left(&line); // Output
-                #ifdef DEBUG
-                printf("1 %.*s\n", line.size, line.data);
-                #endif
-                int reg = asm_get_reg(tok);
-                da_append(&instcode, reg);
+                int reg = asm_parse_reg(prop);
+                da_append(output, reg);
+                if (DEBUG)
+                    printf("Produced REG3 %02X\n", reg);
             }
         }
-        #ifdef DEBUG
-        printf("%02X", instcode.items[0]);
-        for (int i = 1; i < instcode.count; ++i) {
-            printf("-%02X", instcode.items[i]);
-        }
-        printf("\n");
-        printf("%.*s\n", line.size, line.data);
-        #endif
-
-        da_extend(output, instcode.count, instcode.items);
-        onaddress += instcode.count;
-        // fwrite(instcode.items, 1, instcode.count, output_file);
-        lineno += 1;
     }
-
-    if (instcode.items) free(instcode.items);
     return 0;
 }
-
-#include <stdarg.h>
 
 int unassemble(Byte_View bin, String_Builder *sb) {
     size_t pc = 0;
@@ -590,6 +799,7 @@ int unassemble(Byte_View bin, String_Builder *sb) {
         unsigned br = bin.data[pc+2];
         unsigned imm = (br<<8)|ar;
         unsigned cr = bin.data[pc+3];
+        // If the instruction seems to be invalid, treat it as dd.
         if (inst == NULL ||
             cr >= 32 ||
             ((op & 0xF0) != 0xF0 && !(inst->flags & INST_1IMM) && ar >= 32) ||
@@ -607,8 +817,6 @@ int unassemble(Byte_View bin, String_Builder *sb) {
             // No args so nothing interesting here.
         }
         else {
-            // TODO: Make it cleaner.
-
             // 1st argument
             if (inst->flags & INST_1IMM) {
                 sb_printf(sb, " %d", ar);

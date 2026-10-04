@@ -24,7 +24,7 @@ So, the conventions are following:
    After a few minutes poking around, it finally produced a code that some reminded the syntax of my language, but after taking a closer look, I noticed that it wasn't calling any procedures, and hence wasn't working.
    Moral: LLMs cannot learn and like to not addressing their faults.
    Please do not outsource writing writing code and text for UCES to LLMs;
-   It's disrespectful and the code is mostly dirty.
+   It's disrespectful and the output code is mostly dirty.
 6. Do not invent what have been invented before you
    POSIX(R)' and UCES' internal APIs have a plenty of procedures and macros you may need.
    Please check POSIX(R)' documentation, and UCES' code before writing a procedure.
@@ -43,12 +43,12 @@ So, the conventions are following:
 10. Do not leave trash files in commits.
     Stuff like `./foo.ubc`, `./HOMEWORK`, `./fib.bin`, `./bin/build` is least thing most people want to see.
 11. Leave comments if something is far from obvious
-    You can even insert some jokes, just make sure that people won't stare at your code and thing what the heck does it suppose to mean.
+    You can even insert some jokes, just make sure that people won't stare at your code and think what the heck does it suppose to mean.
 12. Don't add new build systems
     Nobody wants to see CMakeLists.txt, Makefile, build.zig, build.py, etc in one repository.
     If you want to add build scripts like build.sh, build.bat, it's fine.
 13. Don't add files like AGENTS.md
-    As I mentioned in recommendation #5, I don't like vibecoding, also, presence of these files in the repo can lead to bad reputation among people who dislike.
+    As I mentioned in recommendation #5, I don't like vibecoding, also, presence of these files in the repo can lead to bad reputation among people who dislike this kind of stuff.
 14. Separate different logic among different procedures & different modules among different compilation units
     If your procedure fetches an instruction, executes the instruction, operates on MMIO and parses Lisp, you problably should separate all these actions to fetch_instruction(), execute_instruction(), read_mmio(), parse_list().
     If you are writing a procedure that parses Lisp for stuff in file uces.c, you probably should create lisp.h and lisp.c for that.

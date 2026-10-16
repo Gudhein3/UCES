@@ -18,13 +18,9 @@ So, the conventions are following:
    Unicode(R) is not a text format, it's a table of characters, and hence doesn't ensure that a file saved in UTF8 will not render properly in UTF16, or ASCII.
    Also, POSIX(R) doesn't require implementing Unicode, hence not all system are supporting Unicode(R).
 5. No AI slop
-   You might have heard some statements like "Learn AI to not left behind"(whatever this supposed to mean), I had.
-   Well, I'm not convinced; In my opinion, vibecoding makes codebase only worse.
-   For example, I asked Github Copilot(R) to write code in my language, for sake of curiosity;
-   After a few minutes poking around, it finally produced a code that some reminded the syntax of my language, but after taking a closer look, I noticed that it wasn't calling any procedures, and hence wasn't working.
-   Moral: LLMs cannot learn and like to not addressing their faults.
-   Please do not outsource writing writing code and text for UCES to LLMs;
+   Do not outsource writing writing code and text for UCES to LLMs;
    It's disrespectful and the output code is mostly dirty.
+   If you for sake of foolness did use an LLM, answer how, what, where, and why as open as possible.
 6. Do not invent what have been invented before you
    POSIX(R)' and UCES' internal APIs have a plenty of procedures and macros you may need.
    Please check POSIX(R)' documentation, and UCES' code before writing a procedure.

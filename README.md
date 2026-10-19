@@ -14,7 +14,7 @@ The source code of assembler and emulator, and architecture specifications are r
     Architecture                                                 \
     Documentation                                                \
     Examples
-## Specific thanks
+## Special thanks
 [HunderedRabits](https://100r.co/site/about.html): \
     Inspired this project \
 [Linus Torvalds](https://github.com/torvalds): \

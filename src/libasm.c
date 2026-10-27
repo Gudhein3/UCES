@@ -217,8 +217,10 @@ static u32 asm_parse_numeric(AsmProp prop, String_View token, Base base) {
             char c = token.data[i];
             if (isdigit(c))
                 num = num * 16 + c - '0';
-            else if (isxdigit(c))
+            else if (isxdigit(c) && isupper(c))
                 num = num * 16 + c - 'A' + 10;
+            else if (isxdigit(c))
+                num = num * 16 + c - 'a' + 10;
             else
                 panic("Unexpected digit in a hexadecimal literal: '%c'(%02X)\n", c, c);
         }
@@ -491,7 +493,7 @@ int asm_export_symbols(const char *srcfile, String_View source_code, SymbolTable
                 address += 12;
             }
             else if (sv_cmp_cstr(tok, ".str") == 0) {
-                for (size_t i = 0; i < line.size; ++i) {
+                for (size_t i = 1; i < line.size; ++i) {  // Skipping the whitespace
                     if (line.data[i] == '\\') {
                         ++i;
                         // Assume that the '\' symbol is followed by only one additional symbol.
@@ -670,7 +672,7 @@ int assemble(const char *srcfile, String_View source_code, ByteArray *output, Sy
                 da_append(output, regy); // t0
             }
             else if (sv_cmp_cstr(tok, ".str") == 0) {
-                for (size_t i = 0; i < line.size; ++i) {
+                for (size_t i = 1; i < line.size; ++i) {  // Skipping the whitespace
                     if (line.data[i] == '\\') {
                         ++i;
                         switch (line.data[i]) {

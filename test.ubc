@@ -1,4 +1,4 @@
-.ld hDEADBEEF a0
+.ld test a0
 .ld putd t0
 call t0
 hlt

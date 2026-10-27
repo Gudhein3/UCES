@@ -103,7 +103,10 @@ static void drive_peek32(u32 addr, u32 *result) {
         *result = 0;
         return;
     }
-    if (addr == 24) {
+    if (addr == 0) {
+        *result = drive_file != NULL; // Did we open the file successfully?
+    }
+    else if (addr == 24) {
         *result = ftell(drive_file);
     }
     else if (addr == 28) {

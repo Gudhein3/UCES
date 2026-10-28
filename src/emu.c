@@ -90,5 +90,5 @@ int main(int argc, char **argv) {
             if ((status & EIS_OVPC) == 0) vm.pc += 4;
         }
     }
-    halt:
+    halt:;
 }

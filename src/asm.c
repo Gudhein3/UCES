@@ -144,7 +144,7 @@ int main(int argc, char **argv) {
             return 1;
         }
         Byte_View bin = (Byte_View) {
-            .data = bin_data,
+            .data = (const u8 *)bin_data,
             .size = bin_size,
         };
         String_Builder out = {0};

@@ -74,11 +74,11 @@ static size_t drive_size = 0;
 static void drive_poke32(u32 addr, u32 value) {
     if (addr == 0) {
         if (drive_file) fclose(drive_file);
-        drive_file = fopen(&vm.memory[value], "rb");
+        drive_file = fopen((char *)&vm.memory[value], "rb");
     }
     else if (addr == 4) {
         if (drive_file) fclose(drive_file);
-        drive_file = fopen(&vm.memory[value], "wb");
+        drive_file = fopen((char *)&vm.memory[value], "wb");
     }
     else if (addr == 8) {
         if (drive_file) fclose(drive_file);

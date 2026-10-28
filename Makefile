@@ -9,7 +9,8 @@ test: all
 	./bin/build/uces-emu bin/test.bin
 
 CC=gcc
-CFLAGS=-ggdb -std=c99 -Wswitch-enum
+CFLAGS=-ggdb -std=c99 -pedantic -Wswitch-enum
+
 OBJECTS4EMU=bin/build/cpu.o bin/build/dev.o bin/build/libasm.o bin/build/mmu.o bin/build/strings.o bin/build/uces.o
 OBJECTS4ASM=bin/build/libasm.o bin/build/uces.o bin/build/strings.o
 

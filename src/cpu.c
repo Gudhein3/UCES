@@ -24,23 +24,23 @@ void write_register(u8 r, u32 d) {
 void write_registerl(u8 r, u16 d) {
     if (r == 0) return;
     if (r == 1) {
-        vm.pc = vm.pc&0xFFFF0000|d;
+        vm.pc = (vm.pc&0xFFFF0000)|d;
         is_pc_rewritten = 1;
         return;
     }
     if (r >= 32) return;
-    vm.registers[r-2] = vm.registers[r-2]&0xFFFF0000|d;
+    vm.registers[r-2] = (vm.registers[r-2]&0xFFFF0000)|d;
 }
 
 void write_registerh(u8 r, u16 d) {
     if (r == 0) return;
     if (r == 1) {
-        vm.pc = vm.pc&0x0000FFFF|(d<<16);
+        vm.pc = (vm.pc&0x0000FFFF)|(d<<16);
         is_pc_rewritten = 1;
         return;
     }
     if (r >= 32) return;
-    vm.registers[r-2] = vm.registers[r-2]&0x0000FFFF|(d<<16);
+    vm.registers[r-2] = (vm.registers[r-2]&0x0000FFFF)|(d<<16);
 }
 
 #define RR read_register
@@ -80,7 +80,8 @@ void fetch_instruction(u32 pc, OpCode *op, u8 *ar, u8 *br, u8 *cr, u16 *imm) {
 
 typedef EIS(*CpuInstImpl)(u8 ar, u8 br, u8 cr, u32 a, u32 b, u16 imm);
 
-#define define_instruction(name) static EIS cpu_##name(u8 ar, u8 br, u8 cr, u32 a, u32 b, u16 imm)
+#define define_instruction(name) static EIS cpu_##name(u8 ar, u8 br, u8 cr, u32 a, u32 b, u16 imm) { \
+                                 (void)(ar+br+cr+a+b+imm);
 
 #include "insts.c.in"
 

@@ -55,7 +55,7 @@ u32 PEEK32(u32 addr) {
             c |= b << 16;
             devices[i]->peek8(addr + 3 - devices[i]->_mapping_from, &b);
             c |= b << 24;
-            return b;
+            return c;
         }
         else {
             fprintf(stderr, "Something is wrong with the device %08X\n", devices[i]->udid);
@@ -86,7 +86,7 @@ void POKE8(u32 addr, u8 b) {
         else if (devices[i]->peek32) {
             u32 c;
             devices[i]->peek32(addr-devices[i]->_mapping_from, &c);
-            c = c & ~0xFF | b;
+            c = (c & ~0xFF) | b;
             devices[i]->poke32(addr-devices[i]->_mapping_from, c);
         }
         else {

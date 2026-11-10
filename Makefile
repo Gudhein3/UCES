@@ -1,12 +1,17 @@
-.PHONY: test all clear
+.PHONY: test test_record all clear
 
 source_files := $(shell find src/ -iname "*.c" ! -iname "emu.c" ! -iname "asm.c")
 dependency_files := $(source_files:src/%.c=bin/build/%.d)
 all: bin/build/uces-emu bin/build/uces-asm
 
 test: all
-	./bin/build/uces-asm asm test.ubc bin/test.bin
-	./bin/build/uces-emu bin/test.bin
+	cd tests && ../bin/build/uces-asm asm test.ubc test.bin
+	./bin/build/uces-emu tests/test.bin > tests/results.txt
+	diff -u tests/correct.txt tests/results.txt
+
+test_record: all
+	cd tests && ../bin/build/uces-asm asm test.ubc test.bin
+	./bin/build/uces-emu tests/test.bin > tests/correct.txt
 
 CC=gcc
 CFLAGS=-ggdb -std=c99 -pedantic -Wswitch-enum

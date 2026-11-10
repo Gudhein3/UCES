@@ -1,0 +1,29 @@
+ldlx 1 r1
+ldlx 1 r2
+
+fib_loop:
+  push r1
+  push r2
+  mv r1 a0
+  .ld putd r0
+  call r0
+  pop r2
+  pop r1
+
+  mv r1 r3
+  add r1 r2 r1
+  mv r3 r2
+
+  ldhx #h7FE0 r4
+  ldlx 10 r5
+  wr8 r4 r5
+
+  ldlx 100 r3
+  cmp r1 r3 r3
+  tsbi r3 7 r3
+  .ld fib_loop r4
+  mvo r3 r4 pc
+
+hlt
+
+.inc std.ubc

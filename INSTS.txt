@@ -4,22 +4,22 @@ Instructions usually follow this form:
 
 kinda microcode:
  RR(reg) - read a register
- WR(reg, value) - write to a register
+ WR(reg, value) - write into a register
 
- WRL(reg, value) - write to low 16 bits of a register
- WRH(reg, value) - write to high 16 bits of a register
+ WRL(reg, value) - write into the low 16 bits of a register
+ WRH(reg, value) - write into the high 16 bits of a register
 
- MW8(addr, value) - write 8 bits to memory
- MW16(addr, value) - write 16 bits to memory
- MW32(addr, value) - write 32 bits to memory
+ MW8(addr, value) - write 8 bits into the memory
+ MW16(addr, value) - write 16 bits into the memory
+ MW32(addr, value) - write 32 bits into the memory
 
- MR8(addr) - read 8 bits from memory
- MR16(addr) - read 16 bits from memory
- MR32(addr) - read 32 bits from memory
+ MR8(addr) - read 8 bits from the memory
+ MR16(addr) - read 16 bits from the memory
+ MR32(addr) - read 32 bits from the memory
 
- "Signed" means it will be signed extended to 32 bits.
- MRS8(addr, value) - read signed 8 bits from memory
- MRS16(addr, value) - read signed 16 bits from memory
+ "Signed" means the value will be signed extended to 32 bits.
+ MRS8(addr, value) - read signed 8 bits from the memory
+ MRS16(addr, value) - read signed 16 bits from the memory
 
 a = RR(ar)
 b = RR(br)

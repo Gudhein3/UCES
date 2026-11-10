@@ -60,6 +60,6 @@ int parse_symbols(SymbolTable *table, const char *fn, u8 *data, size_t size);
 
 extern const char *regnames[];
 extern AsmInst asm_instructions[]; // Terminated with (AsmInst) {0, 0, NULL}
-int asm_export_symbols(const char *srcfile, String_View source_code, SymbolTable *table);
+u32 asm_export_symbols(u32 address, const char *srcfile, String_View source_code, SymbolTable *table);
 int assemble(const char *srcfile, String_View source_code, ByteArray *output, SymbolTable *symbols_table);
 int unassemble(Byte_View bin, String_Builder *sb);

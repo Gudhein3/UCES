@@ -431,8 +431,7 @@ static int asm_parse_reg(AsmProp prop) {
     panic("Bad register name: \"%.*s\"", tok.size, tok.data);
 }
 
-int asm_export_symbols(const char *srcfile, String_View source_code, SymbolTable *table) {
-    u32 address = 0;
+u32 asm_export_symbols(u32 address, const char *srcfile, String_View source_code, SymbolTable *table) {
     int lineno = 0;
     while (source_code.size > 0) {
         lineno++;
@@ -504,6 +503,28 @@ int asm_export_symbols(const char *srcfile, String_View source_code, SymbolTable
                     }
                 }
             }
+            else if (sv_cmp_cstr(tok, ".inc") == 0) {
+                sv_trim_left(&line);
+                char *filename = malloc(line.size + 1);
+                if (!filename) {
+                    fprintf(stderr, "\x1b[31mFailed to allocate a string: %s\x1b[0m\n", strerror(errno));
+                    exit(1);
+                }
+                memcpy(filename, line.data, line.size);
+                filename[line.size] = 0;
+
+                size_t src_size; // Source code -> String View
+                char *src = (char *)read_file(filename, &src_size);
+                if (src == NULL) {
+                    panic("Failed to read file '%s': %s", filename, strerror(errno));
+                }
+                String_View sv = (String_View) {
+                    .data = src,
+                    .size = src_size
+                };
+                free(filename);
+                address = asm_export_symbols(address, filename, sv, table);
+            }
             else if (sv_cmp_cstr(tok, ".incbin") == 0) {
                 sv_trim_left(&line);
                 char *filename = malloc(line.size + 1);
@@ -513,7 +534,7 @@ int asm_export_symbols(const char *srcfile, String_View source_code, SymbolTable
                 }
                 memcpy(filename, line.data, line.size);
                 filename[line.size] = 0;
-                size_t size = get_file_size(filename); // Hopefully nobody will modify the file before the assemble step.
+                size_t size = get_file_size(filename); // Hopefully nobody will modify the file before the assembling step.
                 if (size == -1) {
                     panic("Failed to open the file: %s", strerror(errno));
                 }
@@ -552,11 +573,13 @@ int asm_export_symbols(const char *srcfile, String_View source_code, SymbolTable
             address += 4;
         }
     }
-    return 0;
+    return address;
 }
 
 int assemble(const char *srcfile, String_View source_code, ByteArray *output, SymbolTable *table) {
-
+    // for (int i = 0; i < table->count; ++i) {
+    //     printf("%.*s\n", table->items[i].label.size, table->items[i].label.data);
+    // }
     u32 address = 0;
     int lineno = 0;
     while (source_code.size > 0) {
@@ -694,6 +717,29 @@ int assemble(const char *srcfile, String_View source_code, ByteArray *output, Sy
                         da_append(output, line.data[i]);
                     }
                 }
+            }
+            else if (sv_cmp_cstr(tok, ".inc") == 0) {
+                sv_trim_left(&line);
+                char *filename = malloc(line.size + 1);
+                if (!filename) {
+                    fprintf(stderr, "\x1b[31mFailed to allocate a string: %s\x1b[0m\n", strerror(errno));
+                    exit(1);
+                }
+                memcpy(filename, line.data, line.size);
+                filename[line.size] = 0;
+
+                size_t src_size; // Source code -> String View
+                char *src = (char *)read_file(filename, &src_size);
+                if (src == NULL) {
+                    panic("Failed to read file '%s': %s", filename, strerror(errno));
+                }
+                String_View sv = (String_View) {
+                    .data = src,
+                    .size = src_size
+                };
+                free(filename);
+                assemble(filename, sv, output, table);
+                free(src);
             }
             else if (sv_cmp_cstr(tok, ".incbin") == 0) {
                 sv_trim_left(&line);

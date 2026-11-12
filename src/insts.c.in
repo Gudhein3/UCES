@@ -40,19 +40,19 @@ define_instruction(not)
     return 0;
 }
 define_instruction(div)
-    WR(cr, (u32)a/(u32)b);
+    WR(cr, a ? (u32)a/(u32)b : 0);
     return 0;
 }
 define_instruction(idiv)
-    WR(cr, (s32)a/(s32)b);
+    WR(cr, a ? (s32)a/(s32)b : 0);
     return 0;
 }
 define_instruction(rem)
-    WR(cr, (u32)a%(u32)b);
+    WR(cr, a ? (u32)a%(u32)b : 0);
     return 0;
 }
 define_instruction(irem)
-    WR(cr, (s32)a%(s32)b);
+    WR(cr, a ? (s32)a%(s32)b : 0);
     return 0;
 }
 define_instruction(mul)

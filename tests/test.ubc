@@ -44,6 +44,14 @@ call r0
 
 label:
 
+ldhx #h7FE0 r4
+ldlx 10 r5
+wr8 r4 r5
+
+.ld putd t0
+idiv zero zero a0
+call t0
+
 hlt
 
 .inc std.ubc

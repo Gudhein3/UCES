@@ -90,6 +90,7 @@ WAIT  - 0xEC             ; Platform dependent. Do not use if you want to wait fo
 ADDI  - 0xED             ; WR(cr, a+(int8_t)br)
 HLT   - 0xEE             ; halt
 UDI   - 0xEF             ; reserved to be an invalid instruction
+PREL  - 0xFB             ; WR(cr, pc+(int16_t)imm)
 LDLX  - 0xFC             ; WR(cr, imm)
 LDHX  - 0xFD             ; WR(cr, imm<<16)
 LDL   - 0xFE             ; WRL(cr, imm)

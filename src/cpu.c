@@ -129,6 +129,7 @@ static CpuInstImpl procedure_array[256] = {
     [OP_DEBUG] = cpu_debug,
     [OP_ADDI]  = cpu_addi,
     [OP_HLT]   = cpu_hlt,
+    [OP_PREL]  = cpu_prel,
     [OP_LDLX]  = cpu_ldlx,
     [OP_LDHX]  = cpu_ldhx,
     [OP_LDL]   = cpu_ldl,

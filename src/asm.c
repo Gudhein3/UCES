@@ -73,9 +73,8 @@ int main(int argc, char **argv) {
             .size = src_size
         };
         ByteArray instcode = {0};
-        int retcode = asm_export_symbols(0, filename, sv, &symtable);
-        retcode = assemble(filename, sv, &instcode, &symtable);
-        if (retcode != 0) return retcode;
+        asm_export_symbols(0, filename, sv, &symtable);
+        assemble(0, filename, sv, &instcode, &symtable);
         fwrite(instcode.items, 1, instcode.count, output_file);
         return 0;
     }
@@ -108,7 +107,7 @@ int main(int argc, char **argv) {
             .size = src_size
         };
         SymbolTable symtable = {0};
-        int retcode = asm_export_symbols(0, filename, sv, &symtable);
+        asm_export_symbols(0, filename, sv, &symtable);
         fprintf(output_file, "UCST");
         int any = 0;
         for (size_t i = 0; i < symtable.count; ++i) {

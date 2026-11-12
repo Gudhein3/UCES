@@ -190,6 +190,11 @@ define_instruction(addi)
     WR(cr, a+(int8_t)br);
     return 0;
 }
+define_instruction(prel)
+    // Register 001 is the PC
+    WR(cr, RR(001)+(int16_t)imm);
+    return 0;
+}
 define_instruction(ldlx)
     WR(cr, imm);
     return 0;

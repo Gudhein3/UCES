@@ -69,6 +69,7 @@ AsmInst asm_instructions[] = { // Terminated with (AsmInst) {0, 0, NULL}
     { OP_HLT,   INST_STND,  "hlt"   },
     { OP_UDI,   INST_STND,  "udi"   },
     { OP_ADDI,  INST_2IMM,  "addi"  },
+    { OP_PREL,  0,          "prel"  },
     { OP_LDLX,  0,          "ldlx"  },
     { OP_LDHX,  0,          "ldhx"  },
     { OP_LDL,   0,          "ldl"   },
@@ -238,8 +239,6 @@ static u32 asm_parse_primary(AsmProp prop) {
         panic("Expected at least one symbol in an expression", 0);
     { // Try unary ops first.
         String_View modified_line = *prop.line;
-        // Maybe this shouldn't be a case and there should be a peekableish interface.
-        // Although, I think the current approach is more flexible in terms of text manipulations.
         String_View token = asm_chop_token(&modified_line);
         if (token.size == 1) {
             switch (token.data[0]) {
@@ -252,6 +251,9 @@ static u32 asm_parse_primary(AsmProp prop) {
             case '!':
                 *prop.line = modified_line;
                 return !asm_parse_primary(prop);
+            case '.':
+                *prop.line = modified_line;
+                return prop.address;
             case '~':
                 *prop.line = modified_line;
                 return 0xFFFFFFFF ^ asm_parse_primary(prop);
@@ -448,7 +450,8 @@ u32 asm_export_symbols(u32 address, const char *srcfile, String_View source_code
             .srcfile=srcfile,
             .lineno=lineno,
             .line=&line,
-            .symbols=table
+            .symbols=table,
+            .address=address
         };
         if (tok.data[tok.size-1] == ':') {
             tok.size -= 1;
@@ -576,11 +579,10 @@ u32 asm_export_symbols(u32 address, const char *srcfile, String_View source_code
     return address;
 }
 
-int assemble(const char *srcfile, String_View source_code, ByteArray *output, SymbolTable *table) {
+u32 assemble(u32 address, const char *srcfile, String_View source_code, ByteArray *output, SymbolTable *table) {
     // for (int i = 0; i < table->count; ++i) {
     //     printf("%.*s\n", table->items[i].label.size, table->items[i].label.data);
     // }
-    u32 address = 0;
     int lineno = 0;
     while (source_code.size > 0) {
         lineno++;
@@ -601,7 +603,8 @@ int assemble(const char *srcfile, String_View source_code, ByteArray *output, Sy
             .srcfile=srcfile,
             .lineno=lineno,
             .line=&line,
-            .symbols=table
+            .symbols=table,
+            .address=address
         };
         if (tok.data[0] == '.') {
             if (sv_cmp_cstr(tok, ".db") == 0) {
@@ -610,6 +613,7 @@ int assemble(const char *srcfile, String_View source_code, ByteArray *output, Sy
                     warning("Too large 8 bit constant: h%08X\n", imm);
                 }
                 da_append(output, imm&0xFF);
+                address += 1;
             }
             else if (sv_cmp_cstr(tok, ".dp") == 0) {
                 assert(0 && "TODO");
@@ -621,6 +625,7 @@ int assemble(const char *srcfile, String_View source_code, ByteArray *output, Sy
                 }
                 da_append(output, imm&0xFF);
                 da_append(output, (imm>>8)&0xFF);
+                address += 2;
             }
             else if (sv_cmp_cstr(tok, ".dd") == 0) {
                 u32 imm = asm_parse_expr(prop);
@@ -628,6 +633,7 @@ int assemble(const char *srcfile, String_View source_code, ByteArray *output, Sy
                 da_append(output, (imm>>8)&0xFF);
                 da_append(output, (imm>>16)&0xFF);
                 da_append(output, (imm>>24)&0xFF);
+                address += 4;
             }
             else if (sv_cmp_cstr(tok, ".org") == 0) {
                 u32 i = asm_parse_expr(prop);
@@ -637,7 +643,7 @@ int assemble(const char *srcfile, String_View source_code, ByteArray *output, Sy
                 u32 imm = asm_parse_expr(prop);
                 int a = asm_parse_reg(prop);
                 if (a == 001) { // PC
-                    warning("Writing to the PC register may lead to PC corruption, due to nature of the '.ld' pseudo instruction. It generates two separated instructions, ldh (i>>16)&0xFFFF reg and ldl i&0xFFFF reg, hopefully, you see why this may cause the corruption", 0);
+                    warning("Writing to the PC register may lead to PC corruption, due to the nature of '.ld' pseudo instruction. It generates two separated instructions, ldh (i>>16)&0xFFFF reg and ldl i&0xFFFF reg, hopefully, you see why this may cause the corruption when the register is the PC", 0);
                 }
                 // Already 32bit :-)
                 da_append(output, OP_LDH);
@@ -648,6 +654,7 @@ int assemble(const char *srcfile, String_View source_code, ByteArray *output, Sy
                 da_append(output, imm&0xFF);
                 da_append(output, (imm>>8)&0xFF);
                 da_append(output, a);
+                address += 8;
             }
             else if (sv_cmp_cstr(tok, ".if") == 0 ||
                      sv_cmp_cstr(tok, ".ifn") == 0) {
@@ -693,6 +700,7 @@ int assemble(const char *srcfile, String_View source_code, ByteArray *output, Sy
                 da_append(output, 27); // t0
                 da_append(output, regx);
                 da_append(output, regy); // t0
+                address += 12;
             }
             else if (sv_cmp_cstr(tok, ".str") == 0) {
                 for (size_t i = 1; i < line.size; ++i) {  // Skipping the whitespace
@@ -711,10 +719,17 @@ int assemble(const char *srcfile, String_View source_code, ByteArray *output, Sy
                         case '0':
                             da_append(output, '\0');
                         break;
+                        case '\\':
+                            da_append(output, '\\');
+                        break;
+                        default:
+                            warning("Unexpected escape code '\\%c', ignoring", line.data[i]);
                         }
+                        address += 1;
                     }
                     else {
                         da_append(output, line.data[i]);
+                        address += 1;
                     }
                 }
             }
@@ -738,7 +753,7 @@ int assemble(const char *srcfile, String_View source_code, ByteArray *output, Sy
                     .size = src_size
                 };
                 free(filename);
-                assemble(filename, sv, output, table);
+                address = assemble(address, filename, sv, output, table);
                 free(src);
             }
             else if (sv_cmp_cstr(tok, ".incbin") == 0) {
@@ -757,6 +772,7 @@ int assemble(const char *srcfile, String_View source_code, ByteArray *output, Sy
                 }
                 free(filename);
                 da_extend(output, size, data);
+                address += size;
                 free(data);
             }
             else if (sv_cmp_cstr(tok, ".incsym") == 0) {
@@ -833,9 +849,10 @@ int assemble(const char *srcfile, String_View source_code, ByteArray *output, Sy
                 if (DEBUG)
                     printf("Produced REG3 %02X\n", reg);
             }
+            address += 4;
         }
     }
-    return 0;
+    return address;
 }
 
 int unassemble(Byte_View bin, String_Builder *sb) {

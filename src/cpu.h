@@ -65,6 +65,7 @@ typedef enum {
     OP_ADDI  = 0xED,
     OP_HLT   = 0xEE,
     OP_UDI   = 0xEF,
+    OP_PREL  = 0xFB,
     OP_LDLX  = 0xFC,
     OP_LDHX  = 0xFD,
     OP_LDL   = 0xFE,

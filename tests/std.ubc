@@ -1,5 +1,7 @@
 
 putd::
+  push r0
+  push r1
   .ld 100000 r0
 
   rem a0 r0 r0
@@ -41,6 +43,8 @@ putd::
   pop r0
 
   pop a0
+  pop r1
+  pop r0
   ret
 
 putdd1:

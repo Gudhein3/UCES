@@ -1,7 +1,7 @@
 Absolute name |Symbolic name |Description/Function                 |Saved by
 x0            |zero          |Always zero                          | -
 x1            |pc            |Program counter                      | Callee
-x2            |ra            |Return address                       | Caller/Callee
+x2            |ra            |Return address                       | Callee
 x3            |sp            |Stack pointer                        | Callee
 x4            |fp            |Frame pointer                        | Callee
 x5            |gv            |Global value                         | Caller

@@ -24,6 +24,30 @@ fib_loop:
   .ld fib_loop r4
   mvo r3 r4 pc
 
+.ld string a0
+.ld string_end - string a1
+.ld puts t0
+call t0
+
+.inc zeros.ubc
+
+.ld putd r0
+prel label - . a0
+call r0
+
+ldhx #h7FE0 r4
+ldlx 10 r5
+wr8 r4 r5
+
+.ld label a0
+call r0
+
+label:
+
 hlt
 
 .inc std.ubc
+
+string:
+  .str Hello, world!\n
+string_end:

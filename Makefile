@@ -1,8 +1,13 @@
-.PHONY: test test_record all clear
+.PHONY: test test_record all clear install
 
 source_files := $(shell find src/ -iname "*.c" ! -iname "emu.c" ! -iname "asm.c")
 dependency_files := $(source_files:src/%.c=bin/build/%.d)
 all: bin/build/uces-emu bin/build/uces-asm
+
+install: all
+# TODO: Add ability to change the installation prefix
+# ~/.local/bin is just my favorite path for my user binaries
+	cp bin/build/uces-emu bin/build/uces-asm ~/.local/bin
 
 test: all
 	cd tests && ../bin/build/uces-asm asm test.ubc test.bin
